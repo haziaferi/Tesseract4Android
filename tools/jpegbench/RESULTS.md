@@ -35,3 +35,33 @@ Limits: synthetic pages, not camera photos; one device; turbo's x86 SIMD was not
 
 `turbo-wrapper/` is the CMake used for the turbo build (ExternalProject, static library
 linked whole into libjpeg.so). `bench.sh` is the runner (expects the corpus in `_work/`).
+
+## Preprocessing before OCR (IJG 9f decoder), 2026-10-12
+
+`PreprocBenchTest` on the same corpus (419 JPEGs; one file's row was cut off by a crash,
+see below). `score_preproc.py` reproduces this.
+
+| Variant | CER | vs no preprocessing (files better / worse) | ms per page |
+|---|---|---|---|
+| none | 0.544 % | | 633 |
+| background normalization | 0.554 % | 54 / 59, p = 0.71 | 640 |
+| 2x upscale | 1.440 % | 124 / 56, but net worse | 924 |
+| darkest channel (min R,G,B) | 0.976 % | 26 / 81, p < 1e-7 | 614 |
+| all three: darkest channel, normalize, 2x | 0.284 % | 125 / 51, p = 2e-8 | 857 |
+| line vote over all five | 0.242 % | | 3668 |
+| most confident of all five | 0.635 % | | 3668 |
+| perfect judge over all five (ceiling) | 0.088 % | | |
+
+The stacked pipeline helps most where errors were: 13 px text 1.11 -> 0.72 %, 17 px
+0.80 -> 0.21 %, red ink 0.87 -> 0.17 %, uneven lighting 1.19 -> 0.28 %. Each step alone
+does not. Tesseract's mean confidence is a poor judge between variants.
+
+On 15 text pages of a Google-digitized scanned book (grayscale, 300 and 600 dpi), Tesseract
+already found 99.5 % of the reference words; normalization and 600 -> 300 dpi scaling moved
+that by about 10 words of 6524. Most remaining error there is short junk read from
+pictures and the margin watermark. `book_reference.py` rebuilds such a book's reference
+text when its PDF has an incomplete ToUnicode map; `score_book.py` scores word-level.
+
+Open: the first preprocessing run's process crashed after about 1700 OCR calls (many on
+2x images). Re-running from that file did not crash, so it is not tied to one image;
+the cause (likely memory growth over a long run) was not captured.
