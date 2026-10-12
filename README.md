@@ -1,4 +1,4 @@
-[![](https://jitpack.io/v/cz.adaptech/tesseract4android.svg)](https://jitpack.io/#cz.adaptech/tesseract4android)
+[![](https://jitpack.io/v/haziaferi/Tesseract4Android.svg)](https://jitpack.io/#haziaferi/Tesseract4Android)
 
 # Tesseract4Android
 
@@ -55,10 +55,10 @@ dependencyResolutionManagement {
 ```gradle
 dependencies {
     // To use Standard variant:
-    implementation 'cz.adaptech.tesseract4android:tesseract4android:4.9.0'
+    implementation 'com.github.haziaferi.Tesseract4Android:tesseract4android:4.10.1'
 
     // To use OpenMP variant:
-    implementation 'cz.adaptech.tesseract4android:tesseract4android-openmp:4.9.0'
+    implementation 'com.github.haziaferi.Tesseract4Android:tesseract4android-openmp:4.10.1'
 }
 ```
 
