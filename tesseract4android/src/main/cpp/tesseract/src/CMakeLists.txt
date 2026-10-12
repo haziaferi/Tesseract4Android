@@ -8,7 +8,8 @@
 #
 # ##############################################################################
 
-cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
+# Require CMake 3.18 for modern features like precompiled headers, unity builds, and better target management
+cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
 
 # In-source builds are disabled.
 if("${CMAKE_CURRENT_SOURCE_DIR}" STREQUAL "${CMAKE_CURRENT_BINARY_DIR}")
@@ -32,11 +33,9 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${EXECUTABLE_OUTPUT_PATH}")
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set_property(GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER "CMake Targets")
 
-if(NOT ${CMAKE_VERSION} VERSION_LESS "3.15.0")
-  if(WIN32)
-    cmake_policy(SET CMP0091 NEW)
-    message(STATUS "Setting policy CMP0091 to NEW")
-  endif()
+if(WIN32)
+  cmake_policy(SET CMP0091 NEW)
+  message(STATUS "Setting policy CMP0091 to NEW")
 endif()
 
 # ##############################################################################
@@ -78,11 +77,17 @@ set(MINIMUM_LEPTONICA_VERSION 1.74)
 
 message(STATUS "Configuring tesseract version ${PACKAGE_VERSION}...")
 
-if(WIN32)
-  option(SW_BUILD "Build with sw" ON)
-else()
-  option(SW_BUILD "Build with sw" OFF)
+# Apple's toolchains dont populate CMAKE_SYSTEM_PROCESSOR when crosscompiling
+# instead it uses CMAKE_OSX_ARCHITECTURES which can contain multiple architectures
+if(APPLE AND NOT CMAKE_SYSTEM_PROCESSOR AND CMAKE_OSX_ARCHITECTURES)
+  list(LENGTH CMAKE_OSX_ARCHITECTURES NO_OF_ARCH)
+  if(NO_OF_ARCH GREATER 1)
+    message(FATAL_ERROR "Apple's universal build for ${NO_OF_ARCH} architectures not supported. CMAKE_OSX_ARCHITECTURES: ${CMAKE_OSX_ARCHITECTURES}")
+  endif()
+  set(CMAKE_SYSTEM_PROCESSOR "${CMAKE_OSX_ARCHITECTURES}" CACHE STRING "Target processor" FORCE)
+  message(STATUS "CMAKE_SYSTEM_PROCESSOR set to '${CMAKE_SYSTEM_PROCESSOR}' from CMAKE_OSX_ARCHITECTURES")
 endif()
+
 option(OPENMP_BUILD "Build with openmp support" OFF) # see issue #1662
 option(GRAPHICS_DISABLED "Disable disable graphics (ScrollView)" OFF)
 option(DISABLED_LEGACY_ENGINE "Disable the legacy OCR engine" OFF)
@@ -100,11 +105,12 @@ option(DISABLE_ARCHIVE "Disable build with libarchive (if available)" OFF)
 option(DISABLE_CURL "Disable build with libcurl (if available)" OFF)
 option(INSTALL_CONFIGS "Install tesseract configs" ON)
 
-if(NOT ${CMAKE_VERSION} VERSION_LESS "3.15.0")
-  if(WIN32 AND MSVC)
-    option(WIN32_MT_BUILD "Build with MT flag for MSVC" OFF)
-  endif()
-endif()
+# Build optimization options
+option(ENABLE_UNITY_BUILD "Enable Unity/Jumbo builds for faster compilation" OFF)
+option(ENABLE_PRECOMPILED_HEADERS "Enable precompiled headers for faster compilation" ON)
+option(ENABLE_CCACHE "Enable ccache for faster incremental builds" ON)
+option(ENABLE_NINJA_POOL "Enable Ninja job pools to manage parallelism" ON)
+
 
 # ##############################################################################
 #
@@ -286,6 +292,8 @@ if(CMAKE_COMPILER_IS_GNUCXX OR MINGW)
 elseif(MSVC)
   add_definitions(-D_CRT_SECURE_NO_WARNINGS)
   add_definitions(-D_CRT_NONSTDC_NO_DEPRECATE) # strdup
+  add_definitions(-D_USE_MATH_DEFINES) # Enable M_PI and other math constants
+  add_definitions(-DNOMINMAX) # Prevent min/max macro conflicts
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /utf-8")
   if(NOT CLANG)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
@@ -378,93 +386,125 @@ add_definitions("-DCMAKE_BUILD")
 
 # ##############################################################################
 #
+# Build optimizations
+#
+# ##############################################################################
+
+# Setup ccache if available and enabled
+if(ENABLE_CCACHE)
+  find_program(CCACHE_PROGRAM ccache)
+  if(CCACHE_PROGRAM)
+    message(STATUS "Found ccache: ${CCACHE_PROGRAM}")
+    set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+    set(CMAKE_C_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+    # Configure ccache for better performance
+    set(ENV{CCACHE_SLOPPINESS} "pch_defines,time_macros")
+    set(ENV{CCACHE_CPP2} "true")
+  else()
+    message(STATUS "ccache not found, disabling ccache support")
+    set(ENABLE_CCACHE OFF)
+  endif()
+endif()
+
+# Setup Ninja job pools for better resource management
+if(ENABLE_NINJA_POOL AND CMAKE_GENERATOR STREQUAL "Ninja")
+  include(ProcessorCount)
+  ProcessorCount(N)
+  if(N GREATER 1)
+    # Use 75% of available cores for compilation, rest for linking
+    math(EXPR COMPILE_JOBS "${N} * 3 / 4")
+    math(EXPR LINK_JOBS "${N} - ${COMPILE_JOBS}")
+    if(LINK_JOBS LESS 1)
+      set(LINK_JOBS 1)
+    endif()
+
+    set_property(GLOBAL PROPERTY JOB_POOLS "compile=${COMPILE_JOBS};link=${LINK_JOBS}")
+    set(CMAKE_JOB_POOL_COMPILE compile)
+    set(CMAKE_JOB_POOL_LINK link)
+    message(STATUS "Ninja job pools: compile=${COMPILE_JOBS}, link=${LINK_JOBS}")
+  endif()
+endif()
+
+# ##############################################################################
+#
 # packages
 #
 # ##############################################################################
 include(CheckFunctions)
 
-if(SW_BUILD)
-  find_package(SW REQUIRED)
-  if(BUILD_SHARED_LIBS)
-    set(SW_BUILD_SHARED_LIBS 1)
-  else()
-    set(SW_BUILD_SHARED_LIBS 0)
+find_package(PkgConfig)
+if(APPLE)
+  if(DEFINED ENV{HOMEBREW_PREFIX})
+    set(HOMEBREW_PREFIX $ENV{HOMEBREW_PREFIX})
+    set(PKG_CONFIG_PATH "${HOMEBREW_PREFIX}/opt/icu4c/lib/pkgconfig:${HOMEBREW_PREFIX}/opt/libarchive/lib/pkgconfig")
+    set(ENV{PKG_CONFIG_PATH} "${PKG_CONFIG_PATH}")
   endif()
-  sw_add_package(org.sw.demo.danbloomberg.leptonica
-                 org.sw.demo.libarchive.libarchive)
-  if(BUILD_TRAINING_TOOLS)
-    sw_add_package(org.sw.demo.gnome.pango.pangocairo
-                   org.sw.demo.unicode.icu.i18n)
-  endif()
-  sw_execute()
-else()
-  find_package(PkgConfig)
-  # Check for required library. option -DLeptonica_DIR=path => cmake hint where
-  # to find leptonica
-  find_package(Leptonica ${MINIMUM_LEPTONICA_VERSION} CONFIG)
-  if(NOT Leptonica_FOUND AND PKG_CONFIG_EXECUTABLE)
-    pkg_check_modules(Leptonica lept>=${MINIMUM_LEPTONICA_VERSION})
-    link_directories(${Leptonica_LIBRARY_DIRS})
-  endif()
-  if(NOT Leptonica_FOUND)
-    message(FATAL_ERROR "Cannot find required library Leptonica. Quitting!")
-  else()
-    message(STATUS "Found leptonica version: ${Leptonica_VERSION}")
-  endif(NOT Leptonica_FOUND)
-  include_directories(${Leptonica_INCLUDE_DIRS})
-
-  check_leptonica_tiff_support()
-  if ((NOT LEPT_TIFF_RESULT EQUAL 0) AND LEPT_TIFF_COMPILE_SUCCESS)
-    message(NOTICE "Leptonica was build without TIFF support! Disabling TIFF support...")
-    set(DISABLE_TIFF ON)
-  elseif(NOT ${CMAKE_VERSION} VERSION_LESS "3.25")
-    message(STATUS "Leptonica was build with TIFF support.")
-  endif()
-
-  # Check for optional libraries.
-  if(DISABLE_TIFF)
-    set(HAVE_TIFFIO_H OFF)
-    message(STATUS "TIFF support disabled.")
-  else(DISABLE_TIFF)
-    find_package(TIFF) # for tesseract
-    if(NOT TIFF_FOUND AND PKG_CONFIG_EXECUTABLE)
-      # try PKG_CONFIG to find libtiff if cmake failed
-      pkg_check_modules(TIFF libtiff-4)
-    endif()
-    if(TIFF_FOUND)
-      set(HAVE_TIFFIO_H ON)
-      include_directories(${TIFF_INCLUDE_DIRS})
-    endif(TIFF_FOUND)
-  endif(DISABLE_TIFF)
-  if(DISABLE_ARCHIVE)
-    set(HAVE_LIBARCHIVE OFF)
-    message(STATUS "LibArchive support disabled.")
-  else(DISABLE_ARCHIVE)
-    find_package(LibArchive)
-    if(NOT LibArchive_FOUND AND PKG_CONFIG_EXECUTABLE)
-      # try PKG_CONFIG to find libarchive if cmake failed
-      pkg_check_modules(LibArchive libarchive)
-    endif()
-    if(LibArchive_FOUND)
-      set(HAVE_LIBARCHIVE ON)
-      include_directories(${LibArchive_INCLUDE_DIRS})
-    endif(LibArchive_FOUND)
-  endif(DISABLE_ARCHIVE)
-  if(DISABLE_CURL)
-    set(HAVE_LIBCURL OFF)
-    message(STATUS "CURL support disabled.")
-  else(DISABLE_CURL)
-    find_package(CURL)
-    if(NOT CURL_FOUND AND PKG_CONFIG_EXECUTABLE)
-      # try PKG_CONFIG to find libcurl if cmake failed
-      pkg_check_modules(CURL libcurl)
-    endif()
-    if(CURL_FOUND)
-      set(HAVE_LIBCURL ON)
-      include_directories(${CURL_INCLUDE_DIRS})
-    endif(CURL_FOUND)
-  endif(DISABLE_CURL)
 endif()
+# Check for required library. option -DLeptonica_DIR=path => cmake hint where
+# to find leptonica
+find_package(Leptonica ${MINIMUM_LEPTONICA_VERSION} CONFIG)
+if(NOT Leptonica_FOUND AND PKG_CONFIG_EXECUTABLE)
+  pkg_check_modules(Leptonica lept>=${MINIMUM_LEPTONICA_VERSION})
+  link_directories(${Leptonica_LIBRARY_DIRS})
+endif()
+if(NOT Leptonica_FOUND)
+  message(FATAL_ERROR "Cannot find required library Leptonica. Quitting!")
+else()
+  message(STATUS "Found leptonica version: ${Leptonica_VERSION}")
+endif(NOT Leptonica_FOUND)
+include_directories(${Leptonica_INCLUDE_DIRS})
+
+check_leptonica_tiff_support()
+if ((NOT LEPT_TIFF_RESULT EQUAL 0) AND LEPT_TIFF_COMPILE_SUCCESS)
+  message(NOTICE "Leptonica was build without TIFF support! Disabling TIFF support...")
+  set(DISABLE_TIFF ON)
+elseif(NOT ${CMAKE_VERSION} VERSION_LESS "3.25")
+  message(STATUS "Leptonica was build with TIFF support.")
+endif()
+
+# Check for optional libraries.
+if(DISABLE_TIFF)
+  set(HAVE_TIFFIO_H OFF)
+  message(STATUS "TIFF support disabled.")
+else(DISABLE_TIFF)
+  find_package(TIFF) # for tesseract
+  if(NOT TIFF_FOUND AND PKG_CONFIG_EXECUTABLE)
+    # try PKG_CONFIG to find libtiff if cmake failed
+    pkg_check_modules(TIFF libtiff-4)
+  endif()
+  if(TIFF_FOUND)
+    set(HAVE_TIFFIO_H ON)
+    include_directories(${TIFF_INCLUDE_DIRS})
+  endif(TIFF_FOUND)
+endif(DISABLE_TIFF)
+if(DISABLE_ARCHIVE)
+  set(HAVE_LIBARCHIVE OFF)
+  message(STATUS "LibArchive support disabled.")
+else(DISABLE_ARCHIVE)
+  find_package(LibArchive)
+  if(NOT LibArchive_FOUND AND PKG_CONFIG_EXECUTABLE)
+    # try PKG_CONFIG to find libarchive if cmake failed
+    pkg_check_modules(LibArchive libarchive)
+  endif()
+  if(LibArchive_FOUND)
+    set(HAVE_LIBARCHIVE ON)
+    include_directories(${LibArchive_INCLUDE_DIRS})
+  endif(LibArchive_FOUND)
+endif(DISABLE_ARCHIVE)
+if(DISABLE_CURL)
+  set(HAVE_LIBCURL OFF)
+  message(STATUS "CURL support disabled.")
+else(DISABLE_CURL)
+  find_package(CURL)
+  if(NOT CURL_FOUND AND PKG_CONFIG_EXECUTABLE)
+    # try PKG_CONFIG to find libcurl if cmake failed
+    pkg_check_modules(CURL libcurl)
+  endif()
+  if(CURL_FOUND)
+    set(HAVE_LIBCURL ON)
+    include_directories(${CURL_INCLUDE_DIRS})
+  endif(CURL_FOUND)
+endif(DISABLE_CURL)
 
 # ##############################################################################
 #
@@ -543,7 +583,6 @@ message(STATUS "MARCH_NATIVE_OPT: ${MARCH_NATIVE_OPT}")
 message(STATUS "HAVE_NEON: ${HAVE_NEON}")
 message(STATUS "Link-time optimization: ${CMAKE_INTERPROCEDURAL_OPTIMIZATION}")
 message(STATUS "--------------------------------------------------------")
-message(STATUS "Build with sw [SW_BUILD]: ${SW_BUILD}")
 message(STATUS "Build with openmp support [OPENMP_BUILD]: ${OPENMP_BUILD}")
 message(STATUS "Build with libarchive support [HAVE_LIBARCHIVE]: "
                "${HAVE_LIBARCHIVE}")
@@ -561,6 +600,16 @@ message(STATUS "Build tests [BUILD_TESTS]: ${BUILD_TESTS}")
 message(STATUS "Use system ICU Library [USE_SYSTEM_ICU]: ${USE_SYSTEM_ICU}")
 message(
   STATUS "Install tesseract configs [INSTALL_CONFIGS]: ${INSTALL_CONFIGS}")
+message(STATUS "--------------------------------------------------------")
+message(STATUS "Modern build optimizations:")
+message(STATUS "Unity build [ENABLE_UNITY_BUILD]: ${ENABLE_UNITY_BUILD}")
+message(STATUS "Precompiled headers [ENABLE_PRECOMPILED_HEADERS]: ${ENABLE_PRECOMPILED_HEADERS}")
+message(STATUS "ccache [ENABLE_CCACHE]: ${ENABLE_CCACHE}")
+if(CMAKE_GENERATOR STREQUAL "Ninja")
+  message(STATUS "Ninja job pools [ENABLE_NINJA_POOL]: ${ENABLE_NINJA_POOL}")
+else()
+  message(STATUS "Ninja job pools [ENABLE_NINJA_POOL]: Disabled (not using Ninja)")
+endif()
 message(STATUS "--------------------------------------------------------")
 message(STATUS)
 
@@ -586,101 +635,18 @@ endif()
 # LIBRARY tesseract
 # ##############################################################################
 
-file(
-  GLOB
-  TESSERACT_SRC
-  src/ccmain/*.cpp
-  src/ccstruct/*.cpp
-  src/ccutil/*.cpp
-  src/classify/*.cpp
-  src/cutil/*.cpp
-  src/dict/*.cpp
-  src/lstm/*.cpp
-  src/textord/*.cpp
-  src/viewer/*.cpp
-  src/wordrec/*.cpp)
+# Include source file lists
+include(cmake/SourceLists.cmake)
+
+# Build the core source file list
+set(TESSERACT_SRC ${TESSERACT_SRC_CORE})
 
 if(DISABLED_LEGACY_ENGINE)
-  # prepend path to list of source files
-  function(prepend_path srcs path)
-    set(tmp, "")
-    foreach(src IN LISTS ${srcs})
-      list(APPEND tmp ${path}/${src})
-    endforeach(src ${srcs})
-    set(${srcs}
-        ${tmp}
-        PARENT_SCOPE)
-  endfunction()
-
-  set(TESSERACT_SRC_LEGACY
-      src/ccmain/adaptions.cpp
-      src/ccmain/docqual.cpp
-      src/ccmain/equationdetect.cpp
-      src/ccmain/fixspace.cpp
-      src/ccmain/fixxht.cpp
-      src/ccmain/osdetect.cpp
-      src/ccmain/par_control.cpp
-      src/ccmain/recogtraining.cpp
-      src/ccmain/superscript.cpp
-      src/ccmain/tessbox.cpp
-      src/ccmain/tfacepp.cpp
-      src/ccstruct/fontinfo.cpp
-      src/ccstruct/params_training_featdef.cpp
-      src/ccutil/ambigs.cpp
-      src/ccutil/bitvector.cpp
-      src/ccutil/indexmapbidi.cpp
-      src/classify/adaptive.cpp
-      src/classify/adaptmatch.cpp
-      src/classify/blobclass.cpp
-      src/classify/cluster.cpp
-      src/classify/clusttool.cpp
-      src/classify/cutoffs.cpp
-      src/classify/featdefs.cpp
-      src/classify/float2int.cpp
-      src/classify/fpoint.cpp
-      src/classify/intfeaturespace.cpp
-      src/classify/intfx.cpp
-      src/classify/intmatcher.cpp
-      src/classify/intproto.cpp
-      src/classify/kdtree.cpp
-      src/classify/mf.cpp
-      src/classify/mfoutline.cpp
-      src/classify/mfx.cpp
-      src/classify/normfeat.cpp
-      src/classify/normmatch.cpp
-      src/classify/ocrfeatures.cpp
-      src/classify/outfeat.cpp
-      src/classify/picofeat.cpp
-      src/classify/protos.cpp
-      src/classify/shapeclassifier.cpp
-      src/classify/shapetable.cpp
-      src/classify/tessclassifier.cpp
-      src/classify/trainingsample.cpp
-      src/dict/permdawg.cpp
-      src/dict/hyphen.cpp
-      src/wordrec/associate.cpp
-      src/wordrec/chop.cpp
-      src/wordrec/chopper.cpp
-      src/wordrec/drawfx.cpp
-      src/wordrec/findseam.cpp
-      src/wordrec/gradechop.cpp
-      src/wordrec/language_model.cpp
-      src/wordrec/lm_consistency.cpp
-      src/wordrec/lm_pain_points.cpp
-      src/wordrec/lm_state.cpp
-      src/wordrec/outlines.cpp
-      src/wordrec/params_model.cpp
-      src/wordrec/pieces.cpp
-      src/wordrec/plotedges.cpp
-      src/wordrec/render.cpp
-      src/wordrec/segsearch.cpp
-      src/wordrec/wordclass.cpp)
-  prepend_path(TESSERACT_SRC_LEGACY "${CMAKE_CURRENT_SOURCE_DIR}")
   list(REMOVE_ITEM TESSERACT_SRC ${TESSERACT_SRC_LEGACY})
 endif(DISABLED_LEGACY_ENGINE)
 
-list(APPEND arch_files src/arch/dotproduct.cpp src/arch/simddetect.cpp
-     src/arch/intsimdmatrix.cpp)
+# Use architecture files from SourceLists.cmake
+set(arch_files ${TESSERACT_SRC_ARCH})
 
 if(DOTPRODUCT_FLAGS)
   set_source_files_properties(src/arch/dotproduct.cpp
@@ -724,33 +690,8 @@ if(HAVE_NEON)
   endif()
 endif(HAVE_NEON)
 
-file(
-  GLOB_RECURSE
-  TESSERACT_HDR
-  include/*
-  src/arch/*.h
-  src/ccmain/*.h
-  src/ccstruct/*.h
-  src/ccutil/*.h
-  src/classify/*.h
-  src/cutil/*.h
-  src/dict/*.h
-  src/lstm/*.h
-  src/textord/*.h
-  src/viewer/*.h
-  src/wordrec/*.h)
-
-set(TESSERACT_SRC
-    ${TESSERACT_SRC}
-    src/api/baseapi.cpp
-    src/api/capi.cpp
-    src/api/renderer.cpp
-    src/api/altorenderer.cpp
-    src/api/pagerenderer.cpp
-    src/api/hocrrenderer.cpp
-    src/api/lstmboxrenderer.cpp
-    src/api/pdfrenderer.cpp
-    src/api/wordstrboxrenderer.cpp)
+# Use explicit header file lists from SourceLists.cmake
+set(TESSERACT_HDR ${TESSERACT_HDR_INCLUDE} ${TESSERACT_HDR_INTERNAL})
 
 set(TESSERACT_CONFIGS
     tessdata/configs/alto
@@ -792,6 +733,55 @@ set(LIBTESSFILES ${TESSERACT_SRC} ${arch_files} ${arch_files_opt}
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${LIBTESSFILES})
 
 add_library(libtesseract ${LIBTESSFILES})
+
+# Apply modern optimizations to the main library
+if(ENABLE_UNITY_BUILD)
+  set_target_properties(libtesseract PROPERTIES UNITY_BUILD ON)
+  set_target_properties(libtesseract PROPERTIES UNITY_BUILD_BATCH_SIZE 16)
+  message(STATUS "Unity build enabled for libtesseract with batch size 16")
+endif()
+
+# Apply precompiled headers to reduce compilation time
+if(ENABLE_PRECOMPILED_HEADERS)
+  target_precompile_headers(libtesseract PRIVATE
+    <vector>
+    <string>
+    <memory>
+    <algorithm>
+    <iostream>
+    <cstdlib>
+    <cstring>
+    <cmath>
+  )
+
+  # Exclude architecture-specific files from PCH due to custom compiler flags
+  set(ARCH_FILES_NO_PCH
+    src/arch/dotproduct.cpp
+    src/arch/dotproductavx.cpp
+    src/arch/dotproductavx512.cpp
+    src/arch/dotproductfma.cpp
+    src/arch/dotproductsse.cpp
+    src/arch/dotproductneon.cpp
+    src/arch/intsimdmatrixavx2.cpp
+    src/arch/intsimdmatrixsse.cpp
+    src/arch/intsimdmatrixneon.cpp
+  )
+
+  foreach(file ${ARCH_FILES_NO_PCH})
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${file}")
+      set_source_files_properties("${file}" PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+    endif()
+  endforeach()
+
+  message(STATUS "Precompiled headers enabled for libtesseract (excluding architecture-specific files)")
+endif()
+
+# Configure build pools for Ninja
+if(ENABLE_NINJA_POOL AND CMAKE_GENERATOR STREQUAL "Ninja")
+  set_target_properties(libtesseract PROPERTIES JOB_POOL_COMPILE compile)
+  set_target_properties(libtesseract PROPERTIES JOB_POOL_LINK link)
+endif()
+
 target_include_directories(
   libtesseract BEFORE
   PRIVATE src
@@ -844,29 +834,17 @@ set_target_properties(
     tesseract$<$<BOOL:${WIN32}>:${VERSION_MAJOR}${VERSION_MINOR}$<$<CONFIG:DEBUG>:d>>
 )
 
-if(SW_BUILD)
-  target_link_libraries(libtesseract PUBLIC org.sw.demo.danbloomberg.leptonica
-                                            org.sw.demo.libarchive.libarchive)
-  file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/TesseractTargets.cmake
-       "include(${CMAKE_CURRENT_BINARY_DIR}/cppan.cmake)\n")
-  export(
-    TARGETS libtesseract
-    APPEND
-    FILE ${CMAKE_CURRENT_BINARY_DIR}/TesseractTargets.cmake
-    NAMESPACE Tesseract::)
-else()
-  target_link_libraries(libtesseract PUBLIC ${Leptonica_LIBRARIES})
+target_link_libraries(libtesseract PUBLIC ${Leptonica_LIBRARIES})
   export(
     TARGETS libtesseract
     FILE ${CMAKE_CURRENT_BINARY_DIR}/TesseractTargets.cmake
     NAMESPACE Tesseract::)
-endif()
 
 if(WIN32
    AND CLANG
    AND OPENMP_BUILD)
   # Workaround for "libomp.lib is not automatically added on Windows" see:
-  # http://lists.llvm.org/pipermail/openmp-dev/2015-August/000857.html
+  # https://lists.llvm.org/pipermail/openmp-dev/2015-August/000857.html
   target_link_libraries(libtesseract PRIVATE ${OpenMP_LIBRARY})
 endif()
 

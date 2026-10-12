@@ -67,7 +67,7 @@ inline const std::vector<std::string> split(const std::string &s, char c) {
 
 // A simple linear congruential random number generator,
 // using Knuth's constants from:
-// http://en.wikipedia.org/wiki/Linear_congruential_generator.
+// https://en.wikipedia.org/wiki/Linear_congruential_generator.
 class TRand {
 public:
   TRand() = default;

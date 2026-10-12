@@ -75,20 +75,20 @@ namespace tesseract {
 // TODO: The parameter classify_enable_adaptive_matcher can cause
 // a segmentation fault if it is set to false (issue #256),
 // so override it here.
-#define classify_enable_adaptive_matcher true
+constexpr bool CLASSIFY_ENABLE_ADAPTIVE_MATCHER_OVERRIDE = true;
 
-#define ADAPT_TEMPLATE_SUFFIX ".a"
+constexpr const char *ADAPT_TEMPLATE_SUFFIX = ".a";
 
-#define MAX_MATCHES 10
-#define UNLIKELY_NUM_FEAT 200
-#define NO_DEBUG 0
-#define MAX_ADAPTABLE_WERD_SIZE 40
+constexpr int MAX_MATCHES = 10;
+constexpr int UNLIKELY_NUM_FEAT = 200;
+constexpr int NO_DEBUG = 0;
+constexpr int MAX_ADAPTABLE_WERD_SIZE = 40;
 
-#define ADAPTABLE_WERD_ADJUSTMENT (0.05)
+constexpr double ADAPTABLE_WERD_ADJUSTMENT = 0.05;
 
-#define Y_DIM_OFFSET (Y_SHIFT - BASELINE_Y_SHIFT)
+constexpr double Y_DIM_OFFSET = Y_SHIFT - BASELINE_Y_SHIFT;
 
-#define WORST_POSSIBLE_RATING (0.0f)
+constexpr float WORST_POSSIBLE_RATING = 0.0f;
 
 struct ADAPT_RESULTS {
   int32_t BlobLength;
@@ -465,7 +465,7 @@ void Classify::EndAdaptiveClassifier() {
   std::string Filename;
   FILE *File;
 
-  if (AdaptedTemplates != nullptr && classify_enable_adaptive_matcher &&
+  if (AdaptedTemplates != nullptr && CLASSIFY_ENABLE_ADAPTIVE_MATCHER_OVERRIDE &&
       classify_save_adapted_templates) {
     Filename = imagefile + ADAPT_TEMPLATE_SUFFIX;
     File = fopen(Filename.c_str(), "wb");
@@ -525,7 +525,7 @@ void Classify::EndAdaptiveClassifier() {
  *                            enables use of pre-adapted templates
  */
 void Classify::InitAdaptiveClassifier(TessdataManager *mgr) {
-  if (!classify_enable_adaptive_matcher) {
+  if (!CLASSIFY_ENABLE_ADAPTIVE_MATCHER_OVERRIDE) {
     return;
   }
   if (AllProtosOn != nullptr) {
@@ -775,7 +775,7 @@ void Classify::InitAdaptedClass(TBLOB *Blob, CLASS_ID ClassId, int FontinfoId, A
  * @return Number of pico-features returned (0 if
  * an error occurred)
  */
-int Classify::GetAdaptiveFeatures(TBLOB *Blob, INT_FEATURE_ARRAY IntFeatures,
+int Classify::GetAdaptiveFeatures(TBLOB *Blob, INT_FEATURE_ARRAY &IntFeatures,
                                   FEATURE_SET *FloatFeatures) {
   FEATURE_SET Features;
   int NumFeatures;
@@ -877,7 +877,7 @@ void Classify::AdaptToChar(TBLOB *Blob, CLASS_ID ClassId, int FontinfoId, float 
         reset_bit(MatchingFontConfigs, cfg);
       }
     }
-    im_.Match(IClass, AllProtosOn, MatchingFontConfigs, NumFeatures, IntFeatures, &int_result,
+    im_.Match(IClass, AllProtosOn, MatchingFontConfigs, NumFeatures, IntFeatures.data(), &int_result,
               classify_adapt_feature_threshold, NO_DEBUG, matcher_debug_separate_windows);
     FreeBitVector(MatchingFontConfigs);
 
@@ -1036,7 +1036,7 @@ void Classify::AddNewResult(const UnicharRating &new_result, ADAPT_RESULTS *resu
  */
 void Classify::AmbigClassifier(const std::vector<INT_FEATURE_STRUCT> &int_features,
                                const INT_FX_RESULT_STRUCT &fx_info, const TBLOB *blob,
-                               INT_TEMPLATES_STRUCT *templates, ADAPT_CLASS_STRUCT **classes,
+                               INT_TEMPLATES_STRUCT *templates,
                                UNICHAR_ID *ambiguities, ADAPT_RESULTS *results) {
   if (int_features.empty()) {
     return;
@@ -1499,7 +1499,7 @@ void Classify::DoAdaptiveMatch(TBLOB *Blob, ADAPT_RESULTS *Results) {
         Results->match.empty()) {
       CharNormClassifier(Blob, *sample, Results);
     } else if (Ambiguities && *Ambiguities >= 0 && !tess_bn_matching) {
-      AmbigClassifier(bl_features, fx_info, Blob, PreTrainedTemplates, AdaptedTemplates->Class,
+      AmbigClassifier(bl_features, fx_info, Blob, PreTrainedTemplates,
                       Ambiguities, Results);
     }
   }
@@ -1667,7 +1667,7 @@ void Classify::ComputeCharNormArrays(FEATURE_STRUCT *norm_feature, INT_TEMPLATES
  * case of error.
  */
 int Classify::MakeNewTemporaryConfig(ADAPT_TEMPLATES_STRUCT *Templates, CLASS_ID ClassId, int FontinfoId,
-                                     int NumFeatures, INT_FEATURE_ARRAY Features,
+                                     int NumFeatures, const INT_FEATURE_ARRAY &Features,
                                      FEATURE_SET FloatFeatures) {
   INT_CLASS_STRUCT *IClass;
   ADAPT_CLASS_STRUCT *Class;

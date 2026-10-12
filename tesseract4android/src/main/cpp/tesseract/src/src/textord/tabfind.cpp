@@ -133,7 +133,7 @@ void TabFind::SetBlockRuleEdges(TO_BLOCK *block) {
 }
 
 // Sets the left and right rule and crossing_rules for the blobs in the given
-// list by fiding the next outermost tabvectors for each blob.
+// list by finding the next outermost tabvectors for each blob.
 void TabFind::SetBlobRuleEdges(BLOBNBOX_LIST *blobs) {
   BLOBNBOX_IT blob_it(blobs);
   for (blob_it.mark_cycle_pt(); !blob_it.cycled_list(); blob_it.forward()) {
@@ -203,7 +203,7 @@ int TabFind::GutterWidth(int bottom_y, int top_y, const TabVector &v, bool ignor
 }
 
 // Find the gutter width and distance to inner neighbour for the given blob.
-void TabFind::GutterWidthAndNeighbourGap(int tab_x, int mean_height, int max_gutter, bool left,
+void TabFind::GutterWidthAndNeighbourGap(int tab_x, int max_gutter, bool left,
                                          BLOBNBOX *bbox, int *gutter_width, int *neighbour_gap) {
   const TBOX &box = bbox->bounding_box();
   // The gutter and internal sides of the box.
@@ -1320,7 +1320,7 @@ bool TabFind::Deskew(TabVector_LIST *hlines, BLOBNBOX_LIST *image_blobs, TO_BLOC
 // Flip the vertical and horizontal lines and rotate the grid ready
 // for working on the rotated image.
 // This also makes parameter adjustments for FindInitialTabVectors().
-void TabFind::ResetForVerticalText(const FCOORD &rotate, const FCOORD &rerotate,
+void TabFind::ResetForVerticalText(const FCOORD &rotate,
                                    TabVector_LIST *horizontal_lines, int *min_gutter_width) {
   // Rotate the horizontal and vertical vectors and swap them over.
   // Only the separators are kept and rotated; other tabs are used

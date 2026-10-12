@@ -38,11 +38,13 @@
 #endif
 
 #include "helpers.h"
+#include "tesserrstream.h" // for tesserr
 
 #include <algorithm>
 #include <cassert>
 #include <cmath> // for M_PI, std::floor
 #include <cstdio>
+#include <cstdlib>         // for strtol
 
 namespace tesseract {
 
@@ -66,7 +68,7 @@ namespace tesseract {
 /** define pad used to snap near horiz/vertical protos to horiz/vertical */
 #define HV_TOLERANCE (0.0025) /* approx 0.9 degrees */
 
-typedef enum { StartSwitch, EndSwitch, LastSwitch } SWITCH_TYPE;
+enum class SWITCH_TYPE { StartSwitch, EndSwitch, LastSwitch };
 #define MAX_NUM_SWITCHES 3
 
 struct FILL_SWITCH {
@@ -504,7 +506,7 @@ INT_TEMPLATES_STRUCT *Classify::CreateIntTemplates(CLASSES FloatProtos,
               target_unicharset.id_to_unichar(ClassId));
     }
     assert(UnusedClassIdIn(IntTemplates, ClassId));
-    IClass = new INT_CLASS_STRUCT(FClass->NumProtos, FClass->NumConfigs);
+    IClass = new INT_CLASS_STRUCT(FClass->NumProtos);
     unsigned fs_size = FClass->font_set.size();
     FontSet fs;
     fs.reserve(fs_size);
@@ -572,13 +574,12 @@ void DisplayIntProto(INT_CLASS_STRUCT *Class, PROTO_ID ProtoId, float Evidence) 
 /// to handle the specified number of protos and configs.
 /// @param MaxNumProtos  number of protos to allocate space for
 /// @param MaxNumConfigs number of configs to allocate space for
-INT_CLASS_STRUCT::INT_CLASS_STRUCT(int MaxNumProtos, int MaxNumConfigs) :
+INT_CLASS_STRUCT::INT_CLASS_STRUCT(int MaxNumProtos) :
   NumProtos(0),
   NumProtoSets((MaxNumProtos + PROTOS_PER_PROTO_SET - 1) / PROTOS_PER_PROTO_SET),
   NumConfigs(0),
   ProtoLengths(MaxNumIntProtosIn(this))
 {
-  assert(MaxNumConfigs <= MAX_NUM_CONFIGS);
   assert(NumProtoSets <= MAX_NUM_PROTO_SETS);
 
   for (int i = 0; i < NumProtoSets; i++) {
@@ -825,7 +826,7 @@ INT_TEMPLATES_STRUCT *Classify::ReadIntTemplates(TFile *fp) {
   if (version_id < 2) {
     /* add an empty nullptr class with class id 0 */
     assert(UnusedClassIdIn(Templates, 0));
-    ClassForClassId(Templates, 0) = new INT_CLASS_STRUCT(1, 1);
+    ClassForClassId(Templates, 0) = new INT_CLASS_STRUCT(1);
     ClassForClassId(Templates, 0)->font_set_id = -1;
     Templates->NumClasses++;
     /* make sure the classes are contiguous */
@@ -1065,7 +1066,7 @@ bool FillerDone(TABLE_FILLER *Filler) {
 
   Next = &(Filler->Switch[Filler->NextSwitch]);
 
-  return Filler->X > Next->X && Next->Type == LastSwitch;
+  return Filler->X > Next->X && Next->Type == SWITCH_TYPE::LastSwitch;
 
 } /* FillerDone */
 
@@ -1174,22 +1175,30 @@ CLASS_ID Classify::GetClassToDebug(const char *Prompt, bool *adaptive_on, bool *
     if (ev_type == SVET_POPUP) {
       if (ev->command_id == IDA_SHAPE_INDEX) {
         if (shape_table_ != nullptr) {
-          *shape_id = atoi(ev->parameter);
+          char* endptr = nullptr;
+          long shape_id_long = strtol(ev->parameter.c_str(), &endptr, 10);
+          if (endptr == ev->parameter.c_str() || *endptr != '\0' ||
+              shape_id_long < INT_MIN || shape_id_long > INT_MAX) {
+            tesserr << "Invalid shape index: " << ev->parameter << "\n";
+            return INVALID_UNICHAR_ID;
+          }
+          *shape_id = static_cast<int>(shape_id_long);
           *adaptive_on = false;
           *pretrained_on = true;
           if (*shape_id >= 0 && static_cast<unsigned>(*shape_id) < shape_table_->NumShapes()) {
             int font_id;
             shape_table_->GetFirstUnicharAndFont(*shape_id, &unichar_id, &font_id);
-            tprintf("Shape %d, first unichar=%d, font=%d\n", *shape_id, unichar_id, font_id);
+            tesserr << "Shape " << *shape_id << ", first unichar=" << unichar_id
+                    << ", font=" << font_id << "\n";
             return unichar_id;
           }
-          tprintf("Shape index '%s' not found in shape table\n", ev->parameter);
+          tesserr << "Shape index '" << ev->parameter << "' not found in shape table\n";
         } else {
-          tprintf("No shape table loaded!\n");
+          tesserr << "No shape table loaded!\n";
         }
       } else {
-        if (unicharset.contains_unichar(ev->parameter)) {
-          unichar_id = unicharset.unichar_to_id(ev->parameter);
+        if (unicharset.contains_unichar(ev->parameter.c_str())) {
+          unichar_id = unicharset.unichar_to_id(ev->parameter.c_str());
           if (ev->command_id == IDA_ADAPTIVE) {
             *adaptive_on = true;
             *pretrained_on = false;
@@ -1207,11 +1216,11 @@ CLASS_ID Classify::GetClassToDebug(const char *Prompt, bool *adaptive_on, bool *
           }
           for (unsigned s = 0; s < shape_table_->NumShapes(); ++s) {
             if (shape_table_->GetShape(s).ContainsUnichar(unichar_id)) {
-              tprintf("%s\n", shape_table_->DebugStr(s).c_str());
+              tesserr << shape_table_->DebugStr(s) << "\n";
             }
           }
         } else {
-          tprintf("Char class '%s' not found in unicharset", ev->parameter);
+          tesserr << "Char class '" << ev->parameter << "' not found in unicharset";
         }
       }
     }
@@ -1306,11 +1315,11 @@ void GetNextFill(TABLE_FILLER *Filler, FILL_SPEC *Fill) {
   Next = &(Filler->Switch[Filler->NextSwitch]);
   while (Filler->X >= Next->X) {
     Fill->X = Filler->X = Next->X;
-    if (Next->Type == StartSwitch) {
+    if (Next->Type == SWITCH_TYPE::StartSwitch) {
       Fill->YStart = Next->Y;
       Filler->StartDelta = Next->Delta;
       Filler->YStart = Next->YInit;
-    } else if (Next->Type == EndSwitch) {
+    } else if (Next->Type == SWITCH_TYPE::EndSwitch) {
       Fill->YEnd = Next->Y;
       Filler->EndDelta = Next->Delta;
       Filler->YEnd = Next->YInit;
@@ -1367,7 +1376,7 @@ void InitTableFiller(float EndPad, float SidePad, float AnglePad, PROTO_STRUCT *
     Filler->YEnd = Bucket16For(Y + SidePad, YS, NB * 256);
     Filler->StartDelta = 0;
     Filler->EndDelta = 0;
-    Filler->Switch[0].Type = LastSwitch;
+    Filler->Switch[0].Type = SWITCH_TYPE::LastSwitch;
     Filler->Switch[0].X = Bucket8For(X + HalfLength + EndPad, XS, NB);
   } else if (fabs(Angle - 0.25) < HV_TOLERANCE || fabs(Angle - 0.75) < HV_TOLERANCE) {
     /* vertical proto - handle as special case */
@@ -1376,7 +1385,7 @@ void InitTableFiller(float EndPad, float SidePad, float AnglePad, PROTO_STRUCT *
     Filler->YEnd = Bucket16For(Y + HalfLength + EndPad, YS, NB * 256);
     Filler->StartDelta = 0;
     Filler->EndDelta = 0;
-    Filler->Switch[0].Type = LastSwitch;
+    Filler->Switch[0].Type = SWITCH_TYPE::LastSwitch;
     Filler->Switch[0].X = Bucket8For(X + SidePad, XS, NB);
   } else {
     /* diagonal proto */
@@ -1413,7 +1422,7 @@ void InitTableFiller(float EndPad, float SidePad, float AnglePad, PROTO_STRUCT *
       YAdjust = XAdjust * Sin / Cos;
       Filler->YEnd = Bucket16For(Start.y + YAdjust, YS, NB * 256);
 
-      Filler->Switch[S1].Type = StartSwitch;
+      Filler->Switch[S1].Type = SWITCH_TYPE::StartSwitch;
       Filler->Switch[S1].X = Bucket8For(Switch1.x, XS, NB);
       Filler->Switch[S1].Y = Bucket8For(Switch1.y, YS, NB);
       XAdjust = Switch1.x - BucketStart(Filler->Switch[S1].X, XS, NB);
@@ -1421,7 +1430,7 @@ void InitTableFiller(float EndPad, float SidePad, float AnglePad, PROTO_STRUCT *
       Filler->Switch[S1].YInit = Bucket16For(Switch1.y - YAdjust, YS, NB * 256);
       Filler->Switch[S1].Delta = Filler->EndDelta;
 
-      Filler->Switch[S2].Type = EndSwitch;
+      Filler->Switch[S2].Type = SWITCH_TYPE::EndSwitch;
       Filler->Switch[S2].X = Bucket8For(Switch2.x, XS, NB);
       Filler->Switch[S2].Y = Bucket8For(Switch2.y, YS, NB);
       XAdjust = Switch2.x - BucketStart(Filler->Switch[S2].X, XS, NB);
@@ -1429,7 +1438,7 @@ void InitTableFiller(float EndPad, float SidePad, float AnglePad, PROTO_STRUCT *
       Filler->Switch[S2].YInit = Bucket16For(Switch2.y + YAdjust, YS, NB * 256);
       Filler->Switch[S2].Delta = Filler->StartDelta;
 
-      Filler->Switch[2].Type = LastSwitch;
+      Filler->Switch[2].Type = SWITCH_TYPE::LastSwitch;
       Filler->Switch[2].X = Bucket8For(End.x, XS, NB);
     } else {
       /* falling diagonal proto */
@@ -1465,7 +1474,7 @@ void InitTableFiller(float EndPad, float SidePad, float AnglePad, PROTO_STRUCT *
       YAdjust = XAdjust * Cos / Sin;
       Filler->YEnd = Bucket16For(Start.y + YAdjust, YS, NB * 256);
 
-      Filler->Switch[S1].Type = EndSwitch;
+      Filler->Switch[S1].Type = SWITCH_TYPE::EndSwitch;
       Filler->Switch[S1].X = Bucket8For(Switch1.x, XS, NB);
       Filler->Switch[S1].Y = Bucket8For(Switch1.y, YS, NB);
       XAdjust = Switch1.x - BucketStart(Filler->Switch[S1].X, XS, NB);
@@ -1473,7 +1482,7 @@ void InitTableFiller(float EndPad, float SidePad, float AnglePad, PROTO_STRUCT *
       Filler->Switch[S1].YInit = Bucket16For(Switch1.y + YAdjust, YS, NB * 256);
       Filler->Switch[S1].Delta = Filler->StartDelta;
 
-      Filler->Switch[S2].Type = StartSwitch;
+      Filler->Switch[S2].Type = SWITCH_TYPE::StartSwitch;
       Filler->Switch[S2].X = Bucket8For(Switch2.x, XS, NB);
       Filler->Switch[S2].Y = Bucket8For(Switch2.y, YS, NB);
       XAdjust = Switch2.x - BucketStart(Filler->Switch[S2].X, XS, NB);
@@ -1481,7 +1490,7 @@ void InitTableFiller(float EndPad, float SidePad, float AnglePad, PROTO_STRUCT *
       Filler->Switch[S2].YInit = Bucket16For(Switch2.y - YAdjust, YS, NB * 256);
       Filler->Switch[S2].Delta = Filler->EndDelta;
 
-      Filler->Switch[2].Type = LastSwitch;
+      Filler->Switch[2].Type = SWITCH_TYPE::LastSwitch;
       Filler->Switch[2].X = Bucket8For(End.x, XS, NB);
     }
   }
