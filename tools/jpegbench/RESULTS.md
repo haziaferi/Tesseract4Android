@@ -65,3 +65,18 @@ text when its PDF has an incomplete ToUnicode map; `score_book.py` scores word-l
 Open: the first preprocessing run's process crashed after about 1700 OCR calls (many on
 2x images). Re-running from that file did not crash, so it is not tied to one image;
 the cause (likely memory growth over a long run) was not captured.
+
+## Adding the stacked pipeline: options scored (score_options.py)
+
+Stacked pipeline on the 15 book pages: words found 99.51 -> 99.49 %, junk 1.72 -> 1.58 %,
+5.8 -> 8.6 s per page, native heap about 110 -> 300 MB on 600 dpi pages (65 -> 113 MB at
+300 dpi). The 2x step also doubles every word-box coordinate.
+
+| | A current | B opt-in method | C on by default | D documented recipe |
+|---|---|---|---|---|
+| weighted score | 0.545 | **0.723** | 0.468 | 0.719 |
+| measured criteria only | 0.529 | 0.712 | 0.447 | 0.712 |
+| wins under 5000 weightings | 0 % | 57 % | 0 % | 43 % |
+
+B and D tie on the measured evidence; they differ only on judgment criteria (effort for
+an app vs. API surface to maintain). C ranks below the current state.

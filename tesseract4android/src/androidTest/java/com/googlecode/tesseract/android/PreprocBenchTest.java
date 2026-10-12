@@ -5,6 +5,7 @@ import static org.junit.Assume.assumeTrue;
 
 import android.content.Context;
 import android.os.Bundle;
+import android.os.Debug;
 import android.util.Log;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -81,6 +82,8 @@ public class PreprocBenchTest {
 					api.setImage(pix);
 					String text = api.getUTF8Text();
 					long ms = (System.nanoTime() - t0) / 1_000_000;
+					Log.i(TAG, "mem " + variant + " " + jpg.getName() + " " + pix.getWidth() + "x" + pix.getHeight()
+							+ "x" + pix.getDepth() + " native_heap_mb=" + Debug.getNativeHeapAllocatedSize() / (1024 * 1024));
 					w.write(variant + "\t" + jpg.getName() + "\t" + api.meanConfidence() + "\t" + ms + "\t"
 							+ text.replace("\\", "\\\\").replace("\t", "\\t").replace("\n", "\\n") + "\n");
 					if (pix != decoded) pix.recycle();
