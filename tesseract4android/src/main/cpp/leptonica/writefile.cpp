@@ -97,6 +97,7 @@ jboolean Java_com_googlecode_leptonica_android_WriteFile_nativeWriteBitmap(JNIEn
   }
 
   pixGetDimensions(pixs, &w, &h, &d);
+  const bool hasAlpha = pixGetSpp(pixs) == 4;
 
   if (w != info.width || h != info.height) {
     LOGE("Bitmap width and height do not match Pix dimensions!");
@@ -125,6 +126,13 @@ jboolean Java_com_googlecode_leptonica_android_WriteFile_nativeWriteBitmap(JNIEn
 
     if (d == 32) {
       memcpy(dst, src, 4 * info.width);
+      if (!hasAlpha) {
+        // RGB images (e.g. decoded JPEGs) leave the alpha byte 0; make them opaque.
+        for (int dw = 0; dw < info.width; dw++) {
+          dstx[3] = 0xFF;
+          dstx += 4;
+        }
+      }
     } else if (d == 8) {
       for (int dw = 0; dw < info.width; dw++) {
         dstx[0] = dstx[1] = dstx[2] = srcx[0];

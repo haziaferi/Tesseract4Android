@@ -19,6 +19,7 @@ package com.googlecode.leptonica.android;
 
 import android.graphics.Bitmap;
 import android.graphics.Bitmap.CompressFormat;
+import android.graphics.Color;
 
 import org.junit.Test;
 
@@ -178,6 +179,43 @@ public class ReadFileTest {
 		bmp.recycle();
 		//noinspection UnusedAssignment
 		encodedData = null;
+		pix.recycle();
+	}
+
+	@Test
+	public void testReadBitmap_alpha() {
+		// Left half opaque red, right half fully transparent.
+		Bitmap bmp = Bitmap.createBitmap(4, 2, Bitmap.Config.ARGB_8888);
+		for (int y = 0; y < 2; y++) {
+			for (int x = 0; x < 4; x++) {
+				bmp.setPixel(x, y, x < 2 ? Color.RED : Color.TRANSPARENT);
+			}
+		}
+
+		Pix pix = ReadFile.readBitmap(bmp);
+		assertNotNull(pix);
+		assertEquals(4, pix.getSpp());
+		assertEquals(Color.RED, pix.getPixel(0, 0));
+		assertEquals(0, Color.alpha(pix.getPixel(3, 1)));
+
+		Bitmap out = WriteFile.writeBitmap(pix);
+		assertNotNull(out);
+		assertEquals(Color.RED, out.getPixel(1, 0));
+		assertEquals(0, Color.alpha(out.getPixel(2, 1)));
+
+		bmp.recycle();
+		out.recycle();
+		pix.recycle();
+	}
+
+	@Test
+	public void testReadBitmap_opaqueStaysRgb() {
+		Bitmap bmp = TestUtils.createTestBitmap(10, 10, Bitmap.Config.ARGB_8888);
+		Pix pix = ReadFile.readBitmap(bmp);
+		assertNotNull(pix);
+		assertEquals(3, pix.getSpp());
+
+		bmp.recycle();
 		pix.recycle();
 	}
 }

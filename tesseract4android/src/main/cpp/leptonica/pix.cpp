@@ -220,11 +220,12 @@ jint Java_com_googlecode_leptonica_android_Pix_nativeGetPixel(JNIEnv *env, jclas
       g = (pixel >> L_GREEN_SHIFT) & 0xFF;
       b = (pixel >> L_BLUE_SHIFT) & 0xFF;
       break;
-    case 32: // 32-bit RGBA
+    case 32: // 32-bit RGB or RGBA
       r = (pixel >> L_RED_SHIFT) & 0xFF;
       g = (pixel >> L_GREEN_SHIFT) & 0xFF;
       b = (pixel >> L_BLUE_SHIFT) & 0xFF;
-      a = (pixel >> L_ALPHA_SHIFT) & 0xFF;
+      // Only a 4-sample Pix has alpha; RGB images (e.g. decoded JPEGs) leave that byte 0.
+      a = pixGetSpp(pix) == 4 ? (pixel >> L_ALPHA_SHIFT) & 0xFF : 0xFF;
       break;
     default: // Not supported
       LOGE("Not a supported color depth: %d", d);

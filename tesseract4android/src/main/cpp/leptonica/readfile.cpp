@@ -143,12 +143,18 @@ jlong Java_com_googlecode_leptonica_android_ReadFile_nativeReadBitmap(JNIEnv *en
   }
 
   PIX *pixd = pixCreate(info.width, info.height, 32);
+  if (pixd == NULL) {
+    LOGE("pixCreate() failed for %dx%d bitmap!", info.width, info.height);
+    AndroidBitmap_unlockPixels(env, bitmap);
+    return (jlong) NULL;
+  }
 
   l_uint32 *src = (l_uint32 *) pixels;
   l_uint32 *dst = pixGetData(pixd);
   l_int32 srcWpl = (info.stride / 4);
   l_int32 dstWpl = pixGetWpl(pixd);
   l_uint8 a, r, g, b;
+  bool opaque = true;
 
   for (int y = 0; y < info.height; y++) {
     l_uint32 *dst_line = dst + (y * dstWpl);
@@ -164,11 +170,18 @@ jlong Java_com_googlecode_leptonica_android_ReadFile_nativeReadBitmap(JNIEnv *en
 
       // Set pixel to Pix format
       *dst_line = a << L_ALPHA_SHIFT | r << L_RED_SHIFT | g << L_GREEN_SHIFT | b << L_BLUE_SHIFT;
+      opaque &= (a == 0xFF);
 
       // Move to the next pixel
       src_line++;
       dst_line++;
     }
+  }
+
+  // A Pix only carries alpha when it has 4 samples per pixel. Mark it so when the
+  // bitmap has any transparency; an opaque bitmap stays a plain RGB Pix.
+  if (!opaque) {
+    pixSetSpp(pixd, 4);
   }
 
 /*
