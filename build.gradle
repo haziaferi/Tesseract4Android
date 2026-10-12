@@ -23,6 +23,3 @@ allprojects {
     }
 }
 
-ext {
-    tesseract4AndroidVersion = '4.9.0'
-}
