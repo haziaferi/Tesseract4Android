@@ -62,9 +62,15 @@ that by about 10 words of 6524. Most remaining error there is short junk read fr
 pictures and the margin watermark. `book_reference.py` rebuilds such a book's reference
 text when its PDF has an incomplete ToUnicode map; `score_book.py` scores word-level.
 
-Open: the first preprocessing run's process crashed after about 1700 OCR calls (many on
-2x images). Re-running from that file did not crash, so it is not tied to one image;
-the cause (likely memory growth over a long run) was not captured.
+The "crash" after long runs is OxygenOS killing the process, not a library fault
+(re-run 2026-10-12 with full monitoring, _work/crashwatch.sh). ApplicationExitInfo:
+reason 9 (EXCESSIVE RESOURCE USAGE), "[BgDetect] kill ... level 3"; logcat shows OnePlus's
+OHPD BgDetect raising chkExcessCpu to level 3 over a 1200 s window, then signal 9. No
+tombstone, no native-crash or app-crash dropbox entry, no OOM. Over the 937 calls before
+the kill the native heap stayed at 45-49 MB, Java heap under 10 MB, RSS 163-172 MB, free
+system memory 4.3 GB, 15 threads, battery 27 -> 31 C. The process had no activity on
+screen (state "empty"). An app running long OCR batches without a visible activity may be
+killed the same way on OnePlus phones; what prevents it was not tested.
 
 ## Adding the stacked pipeline: options scored (score_options.py)
 

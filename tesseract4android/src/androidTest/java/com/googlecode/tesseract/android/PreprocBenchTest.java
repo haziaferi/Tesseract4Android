@@ -54,6 +54,7 @@ import java.util.Locale;
 public class PreprocBenchTest {
 	private static final String TAG = "PreprocBench";
 	private static float capMegapixels = 20f;
+	private static int calls = 0;
 	private static final String DEFAULT_VARIANTS = "base,light,up2x,minchan,all3";
 
 	@Test
@@ -115,7 +116,9 @@ public class PreprocBenchTest {
 					}
 					Log.i(TAG, "mem " + variant + " " + jpg.getName() + " " + pix.getWidth() + "x" + pix.getHeight()
 							+ "x" + pix.getDepth() + " scale=" + String.format(Locale.ROOT, "%.3f", 1 / sx)
-							+ " native_heap_mb=" + Debug.getNativeHeapAllocatedSize() / (1024 * 1024));
+							+ " native_heap_mb=" + Debug.getNativeHeapAllocatedSize() / (1024 * 1024)
+							+ " java_heap_mb=" + (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / (1024 * 1024)
+							+ " call=" + (++calls));
 					w.write(variant + "\t" + jpg.getName() + "\t" + api.meanConfidence() + "\t" + ms + "\t"
 							+ text.replace("\\", "\\\\").replace("\t", "\\t").replace("\n", "\\n") + "\n");
 					if (pix != decoded) pix.recycle();
