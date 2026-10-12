@@ -11,10 +11,10 @@ which is based on [Tesseract Tools for Android][tesseract-android-tools].
 
 This project uses additional libraries (with their own specific licenses):
 
- - [Tesseract OCR][tesseract-ocr] 5.5.1
- - [Leptonica][leptonica] 1.85.0
+ - [Tesseract OCR][tesseract-ocr] 5.5.3
+ - [Leptonica][leptonica] 1.87.0
  - [libjpeg][jpeg] v9f
- - [libpng][png] 1.6.48
+ - [libpng][png] 1.6.59
 
 ## Prerequisites
 
