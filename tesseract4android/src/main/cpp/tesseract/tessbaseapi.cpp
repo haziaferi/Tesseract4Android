@@ -345,7 +345,7 @@ jstring Java_com_googlecode_tesseract_android_TessBaseAPI_nativeGetUTF8Text(JNIE
 
   jstring result = env->NewStringUTF(text);
 
-  free(text);
+  delete[] text;
   nat->resetStateVariables();
 
   return result;
@@ -623,7 +623,7 @@ jstring Java_com_googlecode_tesseract_android_TessBaseAPI_nativeGetHOCRText(JNIE
 
   jstring result = env->NewStringUTF(text);
 
-  free(text);
+  delete[] text;
   nat->resetStateVariables();
 
   return result;
@@ -640,7 +640,7 @@ jstring Java_com_googlecode_tesseract_android_TessBaseAPI_nativeGetBoxText(JNIEn
 
   jstring result = env->NewStringUTF(text);
 
-  free(text);
+  delete[] text;
 
   return result;
 }

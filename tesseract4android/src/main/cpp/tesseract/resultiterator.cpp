@@ -36,7 +36,7 @@ jstring Java_com_googlecode_tesseract_android_ResultIterator_nativeGetUTF8Text(J
   char *text = resultIterator->GetUTF8Text(enumLevel);
   jstring result = env->NewStringUTF(text);
 
-  free(text);
+  delete[] text;
 
   return result;
 }
