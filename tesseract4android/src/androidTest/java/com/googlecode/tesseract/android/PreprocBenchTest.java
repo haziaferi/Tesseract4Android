@@ -43,7 +43,8 @@ import java.util.Locale;
  * <li>capped: minlight, then up to 2x but no larger than {@code capmp} megapixels (default 20)</li>
  * </ul>
  * Optional arguments: {@code dir} (default jpegbench), {@code variants} (comma-separated),
- * {@code from} (skip files whose name sorts before it, to resume a run), {@code step} (take
+ * {@code from} (skip files whose name sorts before it, to resume a run), {@code tessdir} (model
+ * folder under the external files dir), {@code step} (take
  * every n-th file), {@code capmp} (megapixel cap for "capped") and {@code boxes} (also write
  * every word's box, mapped back to the decoded image's coordinates).
  * Runs only with the instrumentation argument {@code preprocbench}; reads the corpus from,
@@ -77,7 +78,12 @@ public class PreprocBenchTest {
 
 		Assets.extractAssets(context);
 		TessBaseAPI api = new TessBaseAPI();
-		assertTrue(api.init(Assets.getTessDataPath(context), Assets.getLanguage()));
+		// tessdir: a folder under the external files dir holding tessdata/eng.traineddata
+		// (e.g. a pushed tessdata_best model); the bundled model otherwise.
+		String tessDir = args.getString("tessdir");
+		String dataPath = tessDir != null ? new File(base, tessDir).getAbsolutePath() : Assets.getTessDataPath(context);
+		assertTrue("Tesseract init failed for " + dataPath, api.init(dataPath, Assets.getLanguage()));
+		Log.i(TAG, "model " + dataPath + "/tessdata/eng.traineddata");
 
 		File out = new File(base, "preprocbench-" + label + ".tsv");
 		File boxOut = new File(base, "preprocbench-" + label + "-boxes.tsv");

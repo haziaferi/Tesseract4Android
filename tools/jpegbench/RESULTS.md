@@ -113,3 +113,44 @@ mostly at the same spot (small blurred text segmented differently after scaling,
 
 Re-scored (`score_options.py --capped`): A 0.545, B 0.750, C 0.618, D 0.746; B wins 57 %
 and D 43 % of 5000 weightings; on measured criteria alone B and D tie at 0.748.
+
+## ScanKnifePlus page size (2400 px, JPEG q85), three models, confidence filter (2026-10-12)
+
+Inputs at ScanKnifePlus's stored page size (`PAGE_MAX_EDGE` 2400, `PAGE_QUALITY` 85).
+Models: bundled `eng` (tessdata, 23.4 MB, with legacy engine), `tessdata_best` (15.4 MB),
+`tessdata_fast` (4.1 MB). Pipeline = capped (darkest channel, normalization, up to 2x).
+
+**Scanned book, 15 pages; reference = the PDF's own text layer (independent).**
+
+| model | none: found / extra | capped: found / extra | s/page (none) |
+|---|---|---|---|
+| bundled | 99.63 / 1.46 % | 99.63 / 1.50 % | 5.0 |
+| best | 99.65 / 1.55 % | 99.71 / 1.78 % | 10.4 |
+| fast | 99.60 / 1.76 % | 99.72 / 1.52 % | 2.7 |
+
+Confidence filter (drop words below a threshold), no pipeline: bundled at 50 -> 99.52 /
+0.48 %; best at 70 -> 99.48 / 0.28 %; fast at 70 -> 99.37 / 0.25 %. About 70-80 % of the
+junk goes for 0.1-0.3 % of real words. Thresholds are model-specific: the bundled model at
+90 keeps only 94.1 % of real words, best and fast about 98.9 %.
+
+**Little Fears (colour RPG book scan, 600 dpi JPEGs, no text layer), 18 text pages.**
+Reference = tessdata_best on the full 600 dpi pages (PC Tesseract 5.5.0), words with
+confidence >= 80 (3584 words). "found" = those words recovered at 2400 px:
+
+| model | none | capped | s/page (none) |
+|---|---|---|---|
+| bundled | 94.89 % | 81.17 % | 6.6 |
+| best | 95.28 % | 82.25 % | 10.7 |
+| fast | 95.03 % | 81.70 % | 3.6 |
+
+The capped pipeline loses about 13-14 points of confidently known words on every model.
+"Extra" is not measurable here: the 2400 px reads contain real text (most frequent extra
+tokens: the, to, and, your, child) that the 600 dpi reference lacks, likely because body
+text is about 40 px high at 600 dpi, above Tesseract's ~30 px LSTM range. The reference is
+incomplete, so only "found" is reported for this book.
+
+Conclusions: the stacked pipeline gives nothing at 2400 px on a clean scan and hurts badly
+on a colour scan with yellowish paper, dark borders and illustrations; it should not be
+built as a general method. Model accuracy differs by under 0.5 point; speed differs 3x
+(fast 2.7-3.6 s, bundled 5.0-6.6 s, best 10.4-10.7 s per page). The confidence filter is
+the one measured improvement on real pages (book).
