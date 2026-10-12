@@ -146,7 +146,7 @@ public:
   }
 
   // Writes to the given file. Returns false in case of error.
-  // Only works with bitwise-serializeable types!
+  // Only works with bitwise-serializable types!
   bool Serialize(FILE *fp) const {
     if (!SerializeSize(fp)) {
       return false;
@@ -170,7 +170,7 @@ public:
   }
 
   // Reads from the given file. Returns false in case of error.
-  // Only works with bitwise-serializeable types!
+  // Only works with bitwise-serializable types!
   // If swap is true, assumes a big/little-endian swap is needed.
   bool DeSerialize(bool swap, FILE *fp) {
     if (!DeSerializeSize(swap, fp)) {
@@ -662,7 +662,7 @@ public:
   ~MATRIX() override;
 
   // Returns true if there are any real classification results.
-  bool Classified(int col, int row, int wildcard_id) const;
+  bool Classified(int col, int row) const;
 
   // Expands the existing matrix in-place to make the band wider, without
   // losing any existing data.

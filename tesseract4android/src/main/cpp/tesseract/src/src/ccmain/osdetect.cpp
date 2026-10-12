@@ -48,18 +48,6 @@ const float kHanRatioInJapanese = 0.3;
 
 const float kNonAmbiguousMargin = 1.0;
 
-// General scripts
-static const char *han_script = "Han";
-static const char *latin_script = "Latin";
-static const char *katakana_script = "Katakana";
-static const char *hiragana_script = "Hiragana";
-static const char *hangul_script = "Hangul";
-
-// Pseudo-scripts Name
-const char *ScriptDetector::korean_script_ = "Korean";
-const char *ScriptDetector::japanese_script_ = "Japanese";
-const char *ScriptDetector::fraktur_script_ = "Fraktur";
-
 void OSResults::update_best_orientation() {
   float first = orientations[0];
   float second = orientations[1];
@@ -124,7 +112,7 @@ int OSResults::get_best_script(int orientation_id) const {
 }
 
 // Print the script scores for all possible orientations.
-void OSResults::print_scores(void) const {
+void OSResults::print_scores() const {
   for (int i = 0; i < 4; ++i) {
     tprintf("Orientation id #%d", i);
     print_scores(i);
@@ -199,7 +187,7 @@ int orientation_and_script_detection(const char *filename, OSResults *osr,
   int height = pixGetHeight(tess->pix_binary());
 
   BLOCK_LIST blocks;
-  if (!read_unlv_file(name, width, height, &blocks)) {
+  if (!read_unlv_file(name, height, &blocks)) {
     FullPageBlock(width, height, &blocks);
   }
 
@@ -324,7 +312,8 @@ int os_detect_blobs(const std::vector<int> *allowed_scripts, BLOBNBOX_CLIST *blo
 // Processes a single blob to estimate script and orientation.
 // Return true if estimate of orientation and script satisfies stopping
 // criteria.
-bool os_detect_blob(BLOBNBOX *bbox, OrientationDetector *o, ScriptDetector *s, OSResults *osr,
+bool os_detect_blob(BLOBNBOX *bbox, OrientationDetector *o,
+                    ScriptDetector *s, OSResults */*osr*/,
                     tesseract::Tesseract *tess) {
   tess->tess_cn_matching.set_value(true); // turn it on
   tess->tess_bn_matching.set_value(false);
@@ -385,9 +374,8 @@ bool OrientationDetector::detect_blob(BLOB_CHOICE_LIST *scores) {
         for (choice_it.mark_cycle_pt(); !choice_it.cycled_list() && choice == nullptr;
              choice_it.forward()) {
           int choice_script = choice_it.data()->script_id();
-          unsigned s = 0;
-          for (s = 0; s < allowed_scripts_->size(); ++s) {
-            if ((*allowed_scripts_)[s] == choice_script) {
+          for (auto script : *allowed_scripts_) {
+            if (script == choice_script) {
               choice = choice_it.data();
               break;
             }
@@ -450,14 +438,16 @@ ScriptDetector::ScriptDetector(const std::vector<int> *allowed_scripts, OSResult
   osr_ = osr;
   tess_ = tess;
   allowed_scripts_ = allowed_scripts;
-  katakana_id_ = tess_->unicharset.add_script(katakana_script);
-  hiragana_id_ = tess_->unicharset.add_script(hiragana_script);
-  han_id_ = tess_->unicharset.add_script(han_script);
-  hangul_id_ = tess_->unicharset.add_script(hangul_script);
-  japanese_id_ = tess_->unicharset.add_script(japanese_script_);
-  korean_id_ = tess_->unicharset.add_script(korean_script_);
-  latin_id_ = tess_->unicharset.add_script(latin_script);
-  fraktur_id_ = tess_->unicharset.add_script(fraktur_script_);
+  // General scripts
+  katakana_id_ = tess_->unicharset.add_script("Katakana");
+  hiragana_id_ = tess_->unicharset.add_script("Hiragana");
+  han_id_ = tess_->unicharset.add_script("Han");
+  hangul_id_ = tess_->unicharset.add_script("Hangul");
+  latin_id_ = tess_->unicharset.add_script("Latin");
+  // Pseudo-scripts
+  fraktur_id_ = tess_->unicharset.add_script("Fraktur");
+  japanese_id_ = tess_->unicharset.add_script("Japanese");
+  korean_id_ = tess_->unicharset.add_script("Korean");
 }
 
 // Score the given blob and return true if it is now sure of the script after

@@ -1,4 +1,5 @@
 ## run autogen.sh to create Makefile.in from this file
+export MACOSX_DEPLOYMENT_TARGET = @MACOSX_DEPLOYMENT_TARGET@
 ACLOCAL_AMFLAGS = -I m4
 
 .PHONY: doc html install-langs ScrollView.jar install-jars pdf training
@@ -88,10 +89,16 @@ endif
 
 AM_CXXFLAGS = $(OPENMP_CXXFLAGS)
 
-# Rules for src/api.
+libtesseract_la_LIBADD =
+libtesseract_la_SOURCES =
+
+# Common rules for libtesseract.
 
 libtesseract_la_CPPFLAGS = $(AM_CPPFLAGS)
 libtesseract_la_CPPFLAGS += -DTESS_COMMON_TRAINING_API=
+if !NO_TESSDATA_PREFIX
+libtesseract_la_CPPFLAGS += -DTESSDATA_PREFIX='"@datadir@"'
+endif
 libtesseract_la_CPPFLAGS += -I$(top_srcdir)/src/arch
 libtesseract_la_CPPFLAGS += -I$(top_srcdir)/src/ccmain
 libtesseract_la_CPPFLAGS += -I$(top_srcdir)/src/ccstruct
@@ -104,6 +111,7 @@ libtesseract_la_CPPFLAGS += -I$(top_srcdir)/src/textord
 libtesseract_la_CPPFLAGS += -I$(top_srcdir)/src/training/common
 libtesseract_la_CPPFLAGS += -I$(top_srcdir)/src/viewer
 libtesseract_la_CPPFLAGS += -I$(top_srcdir)/src/wordrec
+libtesseract_la_CPPFLAGS += $(libarchive_CFLAGS)
 libtesseract_la_CPPFLAGS += $(libcurl_CFLAGS)
 
 lib_LTLIBRARIES = libtesseract.la
@@ -117,7 +125,11 @@ libtesseract_la_LDFLAGS += $(NOUNDEFINED)
 endif
 libtesseract_la_LDFLAGS += -version-info $(GENERIC_LIBRARY_VERSION)
 
-libtesseract_la_SOURCES = src/api/baseapi.cpp
+# Rules for src/api.
+
+noinst_HEADERS += src/api/pdf_ttf.h
+
+libtesseract_la_SOURCES += src/api/baseapi.cpp
 libtesseract_la_SOURCES += src/api/altorenderer.cpp
 libtesseract_la_SOURCES += src/api/pagerenderer.cpp
 libtesseract_la_SOURCES += src/api/capi.cpp
@@ -127,8 +139,6 @@ libtesseract_la_SOURCES += src/api/pdfrenderer.cpp
 libtesseract_la_SOURCES += src/api/renderer.cpp
 libtesseract_la_SOURCES += src/api/wordstrboxrenderer.cpp
 
-libtesseract_la_LIBADD = libtesseract_ccutil.la
-libtesseract_la_LIBADD += libtesseract_lstm.la
 libtesseract_la_LIBADD += libtesseract_native.la
 
 # Rules for src/arch.
@@ -293,7 +303,6 @@ noinst_HEADERS += src/ccstruct/otsuthr.h
 noinst_HEADERS += src/ccstruct/pageres.h
 noinst_HEADERS += src/ccstruct/pdblock.h
 noinst_HEADERS += src/ccstruct/points.h
-noinst_HEADERS += src/ccstruct/polyaprx.h
 noinst_HEADERS += src/ccstruct/polyblk.h
 noinst_HEADERS += src/ccstruct/quadlsq.h
 noinst_HEADERS += src/ccstruct/quadratc.h
@@ -317,7 +326,6 @@ libtesseract_la_SOURCES += src/ccstruct/blobs.cpp
 libtesseract_la_SOURCES += src/ccstruct/blread.cpp
 libtesseract_la_SOURCES += src/ccstruct/boxread.cpp
 libtesseract_la_SOURCES += src/ccstruct/boxword.cpp
-libtesseract_la_SOURCES += src/ccstruct/ccstruct.cpp
 libtesseract_la_SOURCES += src/ccstruct/coutln.cpp
 libtesseract_la_SOURCES += src/ccstruct/detlinefit.cpp
 libtesseract_la_SOURCES += src/ccstruct/dppoint.cpp
@@ -334,7 +342,6 @@ libtesseract_la_SOURCES += src/ccstruct/otsuthr.cpp
 libtesseract_la_SOURCES += src/ccstruct/pageres.cpp
 libtesseract_la_SOURCES += src/ccstruct/pdblock.cpp
 libtesseract_la_SOURCES += src/ccstruct/points.cpp
-libtesseract_la_SOURCES += src/ccstruct/polyaprx.cpp
 libtesseract_la_SOURCES += src/ccstruct/polyblk.cpp
 libtesseract_la_SOURCES += src/ccstruct/quadlsq.cpp
 libtesseract_la_SOURCES += src/ccstruct/quspline.cpp
@@ -354,18 +361,11 @@ endif
 
 # Rules for src/ccutil
 
-libtesseract_ccutil_la_CPPFLAGS = $(AM_CPPFLAGS)
-libtesseract_ccutil_la_CPPFLAGS += $(libarchive_CFLAGS)
-if !NO_TESSDATA_PREFIX
-libtesseract_ccutil_la_CPPFLAGS += -DTESSDATA_PREFIX='"@datadir@"'
-endif
-
 noinst_HEADERS += src/ccutil/ccutil.h
 noinst_HEADERS += src/ccutil/clst.h
 noinst_HEADERS += src/ccutil/elst2.h
 noinst_HEADERS += src/ccutil/elst.h
 noinst_HEADERS += src/ccutil/errcode.h
-noinst_HEADERS += src/ccutil/fileerr.h
 noinst_HEADERS += src/ccutil/genericheap.h
 noinst_HEADERS += src/ccutil/genericvector.h
 noinst_HEADERS += src/ccutil/helpers.h
@@ -391,23 +391,21 @@ noinst_HEADERS += src/ccutil/indexmapbidi.h
 noinst_HEADERS += src/ccutil/universalambigs.h
 endif
 
-noinst_LTLIBRARIES += libtesseract_ccutil.la
-
-libtesseract_ccutil_la_SOURCES = src/ccutil/ccutil.cpp
-libtesseract_ccutil_la_SOURCES += src/ccutil/errcode.cpp
-libtesseract_ccutil_la_SOURCES += src/ccutil/serialis.cpp
-libtesseract_ccutil_la_SOURCES += src/ccutil/scanutils.cpp
-libtesseract_ccutil_la_SOURCES += src/ccutil/tessdatamanager.cpp
-libtesseract_ccutil_la_SOURCES += src/ccutil/tprintf.cpp
-libtesseract_ccutil_la_SOURCES += src/ccutil/unichar.cpp
-libtesseract_ccutil_la_SOURCES += src/ccutil/unicharcompress.cpp
-libtesseract_ccutil_la_SOURCES += src/ccutil/unicharmap.cpp
-libtesseract_ccutil_la_SOURCES += src/ccutil/unicharset.cpp
-libtesseract_ccutil_la_SOURCES += src/ccutil/params.cpp
+libtesseract_la_SOURCES += src/ccutil/ccutil.cpp
+libtesseract_la_SOURCES += src/ccutil/errcode.cpp
+libtesseract_la_SOURCES += src/ccutil/serialis.cpp
+libtesseract_la_SOURCES += src/ccutil/scanutils.cpp
+libtesseract_la_SOURCES += src/ccutil/tessdatamanager.cpp
+libtesseract_la_SOURCES += src/ccutil/tprintf.cpp
+libtesseract_la_SOURCES += src/ccutil/unichar.cpp
+libtesseract_la_SOURCES += src/ccutil/unicharcompress.cpp
+libtesseract_la_SOURCES += src/ccutil/unicharmap.cpp
+libtesseract_la_SOURCES += src/ccutil/unicharset.cpp
+libtesseract_la_SOURCES += src/ccutil/params.cpp
 if !DISABLED_LEGACY_ENGINE
-libtesseract_ccutil_la_SOURCES += src/ccutil/ambigs.cpp
-libtesseract_ccutil_la_SOURCES += src/ccutil/bitvector.cpp
-libtesseract_ccutil_la_SOURCES += src/ccutil/indexmapbidi.cpp
+libtesseract_la_SOURCES += src/ccutil/ambigs.cpp
+libtesseract_la_SOURCES += src/ccutil/bitvector.cpp
+libtesseract_la_SOURCES += src/ccutil/indexmapbidi.cpp
 endif
 
 # Rules for src/classify.
@@ -425,7 +423,6 @@ noinst_HEADERS += src/classify/intfx.h
 noinst_HEADERS += src/classify/intmatcher.h
 noinst_HEADERS += src/classify/intproto.h
 noinst_HEADERS += src/classify/kdtree.h
-noinst_HEADERS += src/classify/mf.h
 noinst_HEADERS += src/classify/mfdefs.h
 noinst_HEADERS += src/classify/mfoutline.h
 noinst_HEADERS += src/classify/mfx.h
@@ -457,7 +454,6 @@ libtesseract_la_SOURCES += src/classify/intfx.cpp
 libtesseract_la_SOURCES += src/classify/intmatcher.cpp
 libtesseract_la_SOURCES += src/classify/intproto.cpp
 libtesseract_la_SOURCES += src/classify/kdtree.cpp
-libtesseract_la_SOURCES += src/classify/mf.cpp
 libtesseract_la_SOURCES += src/classify/mfoutline.cpp
 libtesseract_la_SOURCES += src/classify/mfx.cpp
 libtesseract_la_SOURCES += src/classify/normfeat.cpp
@@ -505,19 +501,6 @@ endif
 
 # Rules for src/lstm.
 
-libtesseract_lstm_la_CPPFLAGS = $(AM_CPPFLAGS)
-libtesseract_lstm_la_CPPFLAGS += -I$(top_srcdir)/src/arch
-libtesseract_lstm_la_CPPFLAGS += -I$(top_srcdir)/src/ccstruct
-libtesseract_lstm_la_CPPFLAGS += -I$(top_srcdir)/src/ccutil
-libtesseract_lstm_la_CPPFLAGS += -I$(top_srcdir)/src/classify
-libtesseract_lstm_la_CPPFLAGS += -I$(top_srcdir)/src/cutil
-libtesseract_lstm_la_CPPFLAGS += -I$(top_srcdir)/src/dict
-libtesseract_lstm_la_CPPFLAGS += -I$(top_srcdir)/src/lstm
-libtesseract_lstm_la_CPPFLAGS += -I$(top_srcdir)/src/viewer
-if !NO_TESSDATA_PREFIX
-libtesseract_lstm_la_CPPFLAGS += -DTESSDATA_PREFIX='"@datadir@"'
-endif
-
 noinst_HEADERS += src/lstm/convolve.h
 noinst_HEADERS += src/lstm/fullyconnected.h
 noinst_HEADERS += src/lstm/functions.h
@@ -538,25 +521,23 @@ noinst_HEADERS += src/lstm/static_shape.h
 noinst_HEADERS += src/lstm/stridemap.h
 noinst_HEADERS += src/lstm/weightmatrix.h
 
-noinst_LTLIBRARIES += libtesseract_lstm.la
-
-libtesseract_lstm_la_SOURCES = src/lstm/convolve.cpp
-libtesseract_lstm_la_SOURCES += src/lstm/fullyconnected.cpp
-libtesseract_lstm_la_SOURCES += src/lstm/functions.cpp
-libtesseract_lstm_la_SOURCES += src/lstm/input.cpp
-libtesseract_lstm_la_SOURCES += src/lstm/lstm.cpp
-libtesseract_lstm_la_SOURCES += src/lstm/lstmrecognizer.cpp
-libtesseract_lstm_la_SOURCES += src/lstm/maxpool.cpp
-libtesseract_lstm_la_SOURCES += src/lstm/network.cpp
-libtesseract_lstm_la_SOURCES += src/lstm/networkio.cpp
-libtesseract_lstm_la_SOURCES += src/lstm/parallel.cpp
-libtesseract_lstm_la_SOURCES += src/lstm/plumbing.cpp
-libtesseract_lstm_la_SOURCES += src/lstm/recodebeam.cpp
-libtesseract_lstm_la_SOURCES += src/lstm/reconfig.cpp
-libtesseract_lstm_la_SOURCES += src/lstm/reversed.cpp
-libtesseract_lstm_la_SOURCES += src/lstm/series.cpp
-libtesseract_lstm_la_SOURCES += src/lstm/stridemap.cpp
-libtesseract_lstm_la_SOURCES += src/lstm/weightmatrix.cpp
+libtesseract_la_SOURCES += src/lstm/convolve.cpp
+libtesseract_la_SOURCES += src/lstm/fullyconnected.cpp
+libtesseract_la_SOURCES += src/lstm/functions.cpp
+libtesseract_la_SOURCES += src/lstm/input.cpp
+libtesseract_la_SOURCES += src/lstm/lstm.cpp
+libtesseract_la_SOURCES += src/lstm/lstmrecognizer.cpp
+libtesseract_la_SOURCES += src/lstm/maxpool.cpp
+libtesseract_la_SOURCES += src/lstm/network.cpp
+libtesseract_la_SOURCES += src/lstm/networkio.cpp
+libtesseract_la_SOURCES += src/lstm/parallel.cpp
+libtesseract_la_SOURCES += src/lstm/plumbing.cpp
+libtesseract_la_SOURCES += src/lstm/recodebeam.cpp
+libtesseract_la_SOURCES += src/lstm/reconfig.cpp
+libtesseract_la_SOURCES += src/lstm/reversed.cpp
+libtesseract_la_SOURCES += src/lstm/series.cpp
+libtesseract_la_SOURCES += src/lstm/stridemap.cpp
+libtesseract_la_SOURCES += src/lstm/weightmatrix.cpp
 
 # Rules for src/textord.
 
@@ -1027,7 +1008,7 @@ fuzzer-api-512x256: unittest/fuzzers/fuzzer-api.cpp
 
 CLEANFILES += fuzzer-api fuzzer-api-512x256
 
-if ASCIIDOC
+if ASCIIDOCTOR
 
 man_MANS = doc/combine_lang_model.1
 man_MANS += doc/combine_tessdata.1
@@ -1051,30 +1032,22 @@ man_MANS += doc/shapeclustering.1
 man_MANS += doc/unicharambigs.5
 endif
 
-man_xslt = http://docbook.sourceforge.net/release/xsl/current/manpages/docbook.xsl
-
 EXTRA_DIST += $(man_MANS) doc/Doxyfile
 
 html: ${man_MANS:%=%.html}
+
 pdf: ${man_MANS:%=%.pdf}
 
 SUFFIXES = .asc .html .pdf
 
 .asc:
-if HAVE_XML_CATALOG_FILES
-	asciidoc -b docbook -d manpage -o - $< | \
-	XML_CATALOG_FILES=$(XML_CATALOG_FILES) xsltproc --nonet -o $@ $(man_xslt) -
-else
-	asciidoc -b docbook -d manpage -o - $< | \
-	xsltproc --nonet -o $@ $(man_xslt) -
-endif
+	asciidoctor -b manpage -o $@ $<
 
 .asc.html:
-	asciidoc -b html5 -o $@ $<
+	asciidoctor -b html5 -o $@ $<
 
 .asc.pdf:
-	asciidoc -b docbook -d manpage -o $*.dbk $<
-	docbook2pdf -o doc $*.dbk
+	asciidoctor-pdf -o $@ $<
 
 MAINTAINERCLEANFILES = $(man_MANS) Doxyfile
 
@@ -1117,10 +1090,8 @@ unittest_CPPFLAGS += -I$(top_srcdir)/src/ccutil
 unittest_CPPFLAGS += -I$(top_srcdir)/src/classify
 unittest_CPPFLAGS += -I$(top_srcdir)/src/cutil
 unittest_CPPFLAGS += -I$(top_srcdir)/src/dict
-unittest_CPPFLAGS += -I$(top_srcdir)/src/display
 unittest_CPPFLAGS += -I$(top_srcdir)/src/lstm
 unittest_CPPFLAGS += -I$(top_srcdir)/src/textord
-unittest_CPPFLAGS += -I$(top_srcdir)/unittest/base
 unittest_CPPFLAGS += -I$(top_srcdir)/unittest/util
 unittest_CPPFLAGS += $(LEPTONICA_CFLAGS)
 if ENABLE_TRAINING

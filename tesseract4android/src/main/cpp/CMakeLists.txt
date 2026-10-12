@@ -22,8 +22,10 @@
 cmake_minimum_required(VERSION 3.18.1)
 project(Tesseract4Android)
 
-# Tesseract requires newer C++ standard, so let's enable it for all libraries
-set(CMAKE_CXX_STANDARD 17)
+# Tesseract requires newer C++ standard, so let's enable it for all libraries.
+# C++20 matches upstream Tesseract's own CMake build; since 5.5.3 its constexpr
+# operators in ccstruct/points.h do not compile as C++17.
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 

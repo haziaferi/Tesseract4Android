@@ -1,0 +1,31 @@
+# Golden output captured on ONEPLUS A6013 (Android 11, arm64-v8a) from the unmodified
+# 4.9.0 native sources (Tesseract 5.5.1, Leptonica 1.85.0, libpng 1.6.48, IJG libjpeg 9f), NDK r27d.
+info	tesseract=5.5.1	abi=arm64-v8a
+decode	jpg_420.jpg	format=2	360x120x32	data=d0e335a3eb54c660
+decode	jpg_444.jpg	format=2	360x120x32	data=dbd59741e0894296
+decode	jpg_gray.jpg	format=2	360x120x8	data=4dae8df7fed45147
+decode	jpg_progressive.jpg	format=2	360x120x32	data=d0e335a3eb54c660
+decode	jpg_q30.jpg	format=2	360x120x32	data=ccd03f782acbfd4c
+decode	jpg_truncated.jpg	format=0	360x120x32	data=cd7d5b7ebb16e671
+decode	ocr_sample.jpg	format=2	782x728x32	data=dbaa2d5c26f28e37
+decode	png_16bit_gray.png	format=3	360x120x8	data=b9da47c54f89686d
+decode	png_1bit.png	format=3	360x120x1	data=303babd69374e2b0
+decode	png_8bit_gray.png	format=3	360x120x8	data=b9da47c54f89686d
+decode	png_bad_crc_ancillary.png	format=3	360x120x8	data=b9da47c54f89686d
+decode	png_iccp.png	format=3	360x120x32	data=8222f5a46946ee4f
+decode	png_palette.png	format=3	360x120x4	data=b8513e05ef620c6e
+decode	png_palette_trns.png	format=3	360x120x32	data=04065e1a1718916d
+decode	png_rgb.png	format=3	360x120x32	data=8222f5a46946ee4f
+decode	png_rgba.png	format=3	360x120x32	data=30e9704498ef1321
+decode	png_text_chunks.png	format=3	360x120x8	data=b9da47c54f89686d
+decode	png_truncated_idat.png	format=0	360x120x32	data=16fa59254b30b58c
+encode	png_1bit.png	bytes=1ba4c05fef8f0445
+encode	png_8bit_gray.png	bytes=0b68cdd790347967
+encode	png_palette_trns.png	bytes=2962dde1965ce9ef
+encode	png_rgb.png	bytes=ba2375b18ee3ce58
+encode	png_rgba.png	bytes=ccd683b3fa75e9a9
+encode	jpg_420.jpg baseline q85	bytes=dc77d85e4d980835
+encode	jpg_420.jpg progressive q85	bytes=071e997f82d63c8b
+encode	jpg_gray.jpg baseline q85	bytes=75206955189af3af
+encode	jpg_gray.jpg progressive q85	bytes=79ce7ebcaf7a98a0
+ocr	ocr_sample.jpg	conf=81	text=dc24f1178ebd1a07	hocr=76a109feec9c6f00	Tesseract4Android\nFork of tess-two rewritten from scratch to build with CMake and support latest Android Studio and Tesseract OCR.\nThe Java/JNI wrapper files and tests for Leptonica / Tesseract are based on the tess-two project, which is based on\nTesseract Tools for Android.\nDependencies\nThis project uses additional libraries (with their own specific licenses)\ne Tesseract OCR 5.0.1\no Leptonica 1.82.0\no libjpeg vad\no libpng 1.6.37\nPrerequisites\n« Android 4.1 (API 16) or higher\n© Av4.0.0 trained data file(s) for language(s) you want to use. Data files must be copied to the Android device to a\ndirectory named tessdats .\n« Application must hold permission READ_EXTERNAL_STORAGE to access tessdata directory.\nVariants\nThis library is available in two variants.\n« Standard - Single-threaded. Best for single-core processors or when using multiple Tesseract instances in\nparallel.\n+ OpenMP - Multi-threaded. Provides better performance on multi-core processors when using only single\ninstance of Tesseract.

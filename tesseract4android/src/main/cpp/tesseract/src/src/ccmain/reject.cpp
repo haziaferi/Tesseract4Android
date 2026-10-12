@@ -21,8 +21,6 @@
 #  include "config_auto.h"
 #endif
 
-#include "reject.h"
-
 #ifdef DISABLED_LEGACY_ENGINE
 
 #  include "tesseractclass.h"
@@ -37,6 +35,8 @@ int16_t Tesseract::safe_dict_word(const WERD_RES *werd_res) {
 } // namespace tesseract
 
 #else
+
+#  include "reject.h"
 
 #  include "control.h"
 #  include "docqual.h"
@@ -93,7 +93,7 @@ void Tesseract::set_done(WERD_RES *word, int16_t pass) {
  *
  * Sets a reject map for the word.
  *************************************************************************/
-void Tesseract::make_reject_map(WERD_RES *word, ROW *row, int16_t pass) {
+void Tesseract::make_reject_map(WERD_RES *word, int16_t pass) {
   flip_0O(word);
   check_debug_pt(word, -1); // For trap only
   set_done(word, pass);     // Set acceptance
@@ -560,7 +560,7 @@ void Tesseract::reject_mostly_rejects(WERD_RES *word) {
   }
 }
 
-bool Tesseract::repeated_nonalphanum_wd(WERD_RES *word, ROW *row) {
+bool Tesseract::repeated_nonalphanum_wd(WERD_RES *word) {
   if (word->best_choice->unichar_lengths().length() <= 1) {
     return false;
   }

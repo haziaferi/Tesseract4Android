@@ -42,7 +42,7 @@ class MATRIX;
 class WERD_RES;
 
 #define CHARS_PER_LINE 500
-#define MAX_WERD_LENGTH (int64_t)128
+#define MAX_WERD_LENGTH static_cast<int64_t>(128)
 #define NO_RATING -1
 
 /** Struct used to hold temporary information about fragments. */
@@ -280,7 +280,7 @@ public:
   /* dict.cpp ****************************************************************/
 
   /// Initialize Dict class - load dawgs from [lang].traineddata and
-  /// user-specified wordlist and parttern list.
+  /// user-specified wordlist and pattern list.
   static DawgCache *GlobalDawgCache();
   // Sets up ready for a Load or LoadLSTM.
   void SetupForLoad(DawgCache *dawg_cache);
@@ -361,13 +361,11 @@ public:
   }
 
   /// Default (no-op) implementation of probability in context function.
-  double def_probability_in_context(const char *lang, const char *context, int context_bytes,
-                                    const char *character, int character_bytes) {
-    (void)lang;
-    (void)context;
-    (void)context_bytes;
-    (void)character;
-    (void)character_bytes;
+  double def_probability_in_context([[maybe_unused]] const char *lang,
+                                    [[maybe_unused]] const char *context,
+                                    [[maybe_unused]] int context_bytes,
+                                    [[maybe_unused]] const char *character,
+                                    [[maybe_unused]] int character_bytes) {
     return 0.0;
   }
 
@@ -423,7 +421,7 @@ public:
   /// For each of the character classes of the given unichar_id (and the
   /// unichar_id itself) finds the corresponding outgoing node or self-loop
   /// in the given dawg and (after checking that it is valid) records it in
-  /// dawg_args->updated_ative_dawgs. Updates current_permuter if any valid
+  /// dawg_args->updated_active_dawgs. Updates current_permuter if any valid
   /// edges were found.
   void ProcessPatternEdges(const Dawg *dawg, const DawgPosition &info, UNICHAR_ID unichar_id,
                            bool word_end, DawgArgs *dawg_args,
