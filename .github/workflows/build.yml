@@ -1,0 +1,35 @@
+name: Build
+
+on:
+  push:
+    branches: [master, modernize]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v5
+
+      # The NDK version comes from tesseract4android/build.gradle; AGP installs it if
+      # the runner image lacks it. publishToMavenLocal is what jitpack.yml runs, so a
+      # green job here means JitPack can build the same commit: both flavors, all ABIs.
+      - name: Build library, sample and instrumented-test APK
+        run: >
+          ./gradlew --no-daemon
+          publishToMavenLocal
+          :sample:assembleDebug
+          :tesseract4android:assembleStandardDebugAndroidTest
