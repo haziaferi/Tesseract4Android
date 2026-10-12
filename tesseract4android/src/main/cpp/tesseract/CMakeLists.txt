@@ -92,9 +92,13 @@ if (${ANDROID_ABI} STREQUAL "armeabi-v7a")
     set_source_files_properties(${TESS_PATH}arch/dotproductneon.cpp
         PROPERTIES COMPILE_FLAGS -mfpu=neon)
 
-    # Include cpu-features for runtime detection of NEON support
-    include(AndroidNdkModules)
-    android_ndk_import_module_cpufeatures()
+    # Include cpu-features for runtime detection of NEON support.
+    # Built straight from the NDK: AndroidNdkModules.cmake ships with the SDK's
+    # CMake but not with every CMake that AGP 9 may pick (JitPack uses the system one).
+    set(CPU_FEATURES_DIR ${ANDROID_NDK}/sources/android/cpufeatures)
+    include_directories(${CPU_FEATURES_DIR})
+    add_library(cpufeatures ${CPU_FEATURES_DIR}/cpu-features.c)
+    target_link_libraries(cpufeatures dl)
     set(LIBRARY_CPU_FEATURES cpufeatures)
 endif()
 
