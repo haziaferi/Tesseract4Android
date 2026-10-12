@@ -80,3 +80,30 @@ Stacked pipeline on the 15 book pages: words found 99.51 -> 99.49 %, junk 1.72 -
 
 B and D tie on the measured evidence; they differ only on judgment criteria (effort for
 an app vs. API surface to maintain). C ranks below the current state.
+
+## The two conditions, measured (2026-10-12)
+
+**Where the gain comes from.** Darkest channel + normalization without the 2x step
+("minlight") scores 0.564 % CER on the 419 synthetic JPEGs, no better than nothing
+(0.544 %; 52 files better, 109 worse). The gain needs the 2x step.
+
+**Size limit ("capped": up to 2x, at most 20 megapixels).** On the synthetic pages it is
+identical to the uncapped pipeline (all 105 checked pages scaled 2x, same 0.285 % CER).
+On the 15 book pages the 600 dpi scans are not upscaled and the 300 dpi ones are:
+
+| book, 15 pages | none | uncapped | capped |
+|---|---|---|---|
+| words found | 99.51 % | 99.49 % | 99.60 % |
+| extra (junk) | 1.72 % | 1.58 % | 1.39 % |
+| seconds per page | 5.8 | 8.6 | 6.7 |
+| native heap, 600 dpi page | 109 MB | 300 MB | 127 MB |
+| native heap, 300 dpi page | 65 MB | 113 MB | 114 MB |
+
+**Word boxes mapped back to the original image** (score_boxes.py, each word paired with
+the same word in the unprocessed run): median edge offset 0.5 px, median IoU 0.945
+(synthetic) / 0.985 (book). Boxes overlapping less than half: 3.7 % of synthetic words,
+mostly at the same spot (small blurred text segmented differently after scaling, 248 of
+280); 1 % on the book, nearly all a repeated word paired with another occurrence.
+
+Re-scored (`score_options.py --capped`): A 0.545, B 0.750, C 0.618, D 0.746; B wins 57 %
+and D 43 % of 5000 weightings; on measured criteria alone B and D tie at 0.748.

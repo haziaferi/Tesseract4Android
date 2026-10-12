@@ -10,6 +10,7 @@ Each criterion is 0..1, higher is better. "measured" criteria come from RESULTS.
 against random weightings, so it does not hinge on one choice of weights.
 """
 import math
+import sys
 import random
 
 # Measured inputs (OnePlus 6T, RESULTS.md)
@@ -19,6 +20,15 @@ TIME_RATIO = math.sqrt((857 / 633) * (8.6 / 5.8))       # synthetic and book, ge
 MEM_RATIO = math.sqrt((300 / 110) * (113 / 65))         # 600 dpi and 300 dpi book pages
 BOOK_FOUND_DELTA, BOOK_EXTRA_DELTA = -0.02, -0.14       # points of reference words
 
+COORD_PENALTY = 0.5  # C breaks word coordinates for existing callers
+if "--capped" in sys.argv:
+    # Capped pipeline (up to 2x, at most 20 MP), boxes mapped back to the original image.
+    # Synthetic: identical to the uncapped pipeline (all 105 checked pages scaled 2x).
+    TIME_RATIO = math.sqrt((851 / 627) * (6.7 / 5.8))
+    MEM_RATIO = math.sqrt((127 / 109) * (114 / 65))
+    BOOK_FOUND_DELTA, BOOK_EXTRA_DELTA = 0.09, -0.33
+    COORD_PENALTY = 0.0  # boxes map back: median offset 0.5 px (score_boxes.py)
+
 gain = (CER_BASE - CER_PIPE) / CER_BASE                 # relative error reduction when used
 cost = 1 / (TIME_RATIO * MEM_RATIO)                     # 1 = free, lower = costlier
 book = 0.5 + (BOOK_FOUND_DELTA - BOOK_EXTRA_DELTA) / 2  # 0.5 = neutral on real scans
@@ -27,7 +37,7 @@ CRITERIA = {
     # name: (kind, {option: value})
     "accuracy gain available":      ("measured", {"A": 0, "B": gain, "C": gain, "D": gain}),
     "effect on a real scan":        ("measured", {"A": 0.5, "B": book, "C": book, "D": book}),
-    "no regressions for existing users": ("measured", {"A": 1, "B": 1, "C": 1 - FILES_WORSE - 0.5, "D": 1}),
+    "no regressions for existing users": ("measured", {"A": 1, "B": 1, "C": 1 - FILES_WORSE - COORD_PENALTY, "D": 1}),
     "speed and memory by default":  ("measured", {"A": 1, "B": 1, "C": cost, "D": 1}),
     "effort for an app to benefit": ("judgment", {"A": 0, "B": 1, "C": 1, "D": 0.5}),
     "maintenance and API surface":  ("judgment", {"A": 1, "B": 0.6, "C": 0.3, "D": 0.9}),
