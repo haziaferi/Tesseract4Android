@@ -4,15 +4,14 @@ plugins {
 }
 
 android {
-	namespace 'cz.adaptech.tesseract4android'
-	compileSdk 35
-	ndkVersion "27.3.13750724"
+	namespace = 'cz.adaptech.tesseract4android'
+	compileSdk = 37
+	ndkVersion = "27.3.13750724"
 
 	defaultConfig {
-		minSdk 21
-		targetSdk 35
+		minSdk = 21
 
-		testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+		testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 		externalNativeBuild {
 			cmake {
 				// Specifies which native libraries or executables to build and package.
@@ -32,13 +31,13 @@ android {
 	}
 	externalNativeBuild {
 		cmake {
-			path "src/main/cpp/CMakeLists.txt"
-			version '3.22.1'
+			path = "src/main/cpp/CMakeLists.txt"
+			version = '3.22.1'
 		}
 	}
 	buildTypes {
 		release {
-			minifyEnabled false
+			minifyEnabled = false
 			proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
 		}
 		debug {
@@ -83,11 +82,19 @@ android {
 		}
 	}
 	compileOptions {
-		sourceCompatibility JavaVersion.VERSION_17
-		targetCompatibility JavaVersion.VERSION_17
+		sourceCompatibility = JavaVersion.VERSION_17
+		targetCompatibility = JavaVersion.VERSION_17
 	}
 	buildFeatures {
-		buildConfig true
+		buildConfig = true
+	}
+	// A library has no targetSdk of its own (AGP 9 removed it from defaultConfig);
+	// it only matters for the instrumented-test APK and for lint.
+	testOptions {
+		targetSdk = 37
+	}
+	lint {
+		targetSdk = 37
 	}
 }
 
@@ -111,16 +118,16 @@ afterEvaluate {
 			standard(MavenPublication) {
 				from components.findByName('standardRelease')
 
-				groupId 'cz.adaptech'
-				artifactId 'tesseract4android'
-				version rootProject.ext.tesseract4AndroidVersion
+				groupId = 'cz.adaptech'
+				artifactId = 'tesseract4android'
+				version = rootProject.ext.tesseract4AndroidVersion
 			}
 			openmp(MavenPublication) {
 				from components.findByName('openmpRelease')
 
-				groupId 'cz.adaptech'
-				artifactId 'tesseract4android-openmp'
-				version rootProject.ext.tesseract4AndroidVersion
+				groupId = 'cz.adaptech'
+				artifactId = 'tesseract4android-openmp'
+				version = rootProject.ext.tesseract4AndroidVersion
 			}
 		}
 	}

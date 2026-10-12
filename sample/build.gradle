@@ -3,31 +3,31 @@ plugins {
 }
 
 android {
-    namespace 'cz.adaptech.tesseract4android.sample'
-    compileSdk 35
+    namespace = 'cz.adaptech.tesseract4android.sample'
+    compileSdk = 37
 
     defaultConfig {
         applicationId "cz.adaptech.tesseract4android.sample"
-        minSdk 21
-        targetSdk 35
-        versionCode 1
-        versionName "1.0"
+        minSdk = 21
+        targetSdk = 37
+        versionCode = 1
+        versionName = "1.0"
 
-        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled = false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     buildFeatures {
-        viewBinding true
+        viewBinding = true
     }
 }
 
@@ -47,13 +47,13 @@ dependencies {
     // To use library from JitPack
     // Note that since we have 2 artifacts, we must use cz.adaptech.tesseract4android groupId,
     // instead of just cz.adaptech groupId we use when using local maven repository.
-    implementation "cz.adaptech.tesseract4android:tesseract4android:$tesseract4AndroidVersion" // standard flavor
-//    implementation "cz.adaptech.tesseract4android:tesseract4android-openmp:$tesseract4AndroidVersion" // openmp flavor
+    implementation "cz.adaptech.tesseract4android:tesseract4android:${rootProject.ext.tesseract4AndroidVersion}" // standard flavor
+//    implementation "cz.adaptech.tesseract4android:tesseract4android-openmp:${rootProject.ext.tesseract4AndroidVersion}" // openmp flavor
 
     // To use library from local maven repository
     // Don't forget to specify mavenLocal() in repositories block in project's build.gradle file
-//    implementation "cz.adaptech:tesseract4android:$tesseract4AndroidVersion" // standard flavor
-//    implementation "cz.adaptech:tesseract4android-openmp:$tesseract4AndroidVersion" // openmp flavor
+//    implementation "cz.adaptech:tesseract4android:${rootProject.ext.tesseract4AndroidVersion}" // standard flavor
+//    implementation "cz.adaptech:tesseract4android-openmp:${rootProject.ext.tesseract4AndroidVersion}" // openmp flavor
 
     // To use library compiled locally
     // Which flavor to use is determined by missingDimensionStrategy parameter above.
