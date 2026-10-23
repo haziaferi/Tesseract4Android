@@ -43,6 +43,8 @@ import androidx.test.platform.app.InstrumentationRegistry;
 
 import com.googlecode.leptonica.android.Pix;
 import com.googlecode.leptonica.android.Pixa;
+import com.googlecode.leptonica.android.ReadFile;
+import com.googlecode.leptonica.android.Rotate;
 import com.googlecode.tesseract.android.TessBaseAPI.PageIteratorLevel;
 import com.googlecode.tesseract.android.TessBaseAPI.ProgressNotifier;
 import com.googlecode.tesseract.android.TessBaseAPI.ProgressValues;
@@ -119,6 +121,55 @@ public class TessBaseAPITest {
 		// Attempt to shut down the API.
 		baseApi.recycle();
 		bmp.recycle();
+	}
+
+	@Test
+	public void testDetectOrientationScript() {
+		final String inputText = "The quick brown fox jumps over the lazy dog.\n" +
+				"Pack my box with five dozen liquor jugs.\n" +
+				"How vexingly quick daft zebras jump!\n" +
+				"Sphinx of black quartz, judge my vow.\n" +
+				"The five boxing wizards jump quickly.\n" +
+				"Jackdaws love my big sphinx of quartz.\n" +
+				"Waltz, bad nymph, for quick jigs vex.\n" +
+				"Glib jocks quiz nymph to vex dwarf.";
+		final Bitmap bmp = TessBaseAPITest.getTextImage(inputText, 800, 600);
+		final Pix upright = ReadFile.readBitmap(bmp);
+
+		final TessBaseAPI baseApi = new TessBaseAPI();
+		assertTrue(baseApi.init(tessDataPath, "osd", TessBaseAPI.OEM_TESSERACT_ONLY));
+
+		// Turn the page clockwise by each quarter; OSD must give the turn back.
+		for (int quads = 0; quads < 4; quads++) {
+			final Pix turned = Rotate.rotateOrth(upright, quads);
+			baseApi.setImage(turned);
+			TessBaseAPI.OrientationScript osd = baseApi.detectOrientationScript();
+			turned.recycle();
+
+			assertNotNull("No detection for " + quads * 90 + " degrees", osd);
+			assertEquals("Rotation for a page turned " + quads * 90 + " degrees: " + osd,
+					(360 - quads * 90) % 360, osd.getRotateClockwise());
+			assertEquals(osd.getRotateClockwise(), (360 - osd.getOrientation()) % 360);
+			assertTrue(osd.toString(), osd.getOrientationConfidence() > 0);
+			assertEquals(osd.toString(), "Latin", osd.getScript());
+		}
+
+		// A blank page has no characters to decide on.
+		final Pix blank = ReadFile.readBitmap(TessBaseAPITest.getTextImage("", 800, 600));
+		baseApi.setImage(blank);
+		assertNull(baseApi.detectOrientationScript());
+		blank.recycle();
+
+		baseApi.recycle();
+		upright.recycle();
+		bmp.recycle();
+	}
+
+	@Test(expected = IllegalStateException.class)
+	public void testDetectOrientationScriptAfterRecycle() {
+		final TessBaseAPI baseApi = new TessBaseAPI();
+		baseApi.recycle();
+		baseApi.detectOrientationScript();
 	}
 
 	private static Bitmap getTextImage(String text, int width, int height) {

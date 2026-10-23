@@ -55,10 +55,10 @@ dependencyResolutionManagement {
 ```gradle
 dependencies {
     // To use Standard variant:
-    implementation 'com.github.haziaferi.Tesseract4Android:tesseract4android:4.10.1'
+    implementation 'com.github.haziaferi.Tesseract4Android:tesseract4android:4.11.0'
 
     // To use OpenMP variant:
-    implementation 'com.github.haziaferi.Tesseract4Android:tesseract4android-openmp:4.10.1'
+    implementation 'com.github.haziaferi.Tesseract4Android:tesseract4android-openmp:4.11.0'
 }
 ```
 
@@ -99,6 +99,25 @@ String text = tess.getUTF8Text();
 // Release the native Tesseract instance when you don't want to use it anymore
 // After this call, no method can be called on this TessBaseAPI instance
 tess.recycle();
+```
+
+### Orientation and script detection
+
+`detectOrientationScript()` tells which way up a page is, so it can be turned before recognition. It needs
+[`osd.traineddata`](https://github.com/tesseract-ocr/tessdata_fast/blob/main/osd.traineddata) in the same `tessdata`
+directory, and its own instance initialized with the `osd` language:
+
+```java
+TessBaseAPI osd = new TessBaseAPI();
+osd.init(dataPath, "osd", TessBaseAPI.OEM_TESSERACT_ONLY);
+osd.setImage(image);
+TessBaseAPI.OrientationScript result = osd.detectOrientationScript(); // null if the page has too little text
+osd.recycle();
+
+if (result != null) {
+    int degrees = result.getRotateClockwise(); // turn the image clockwise by this much
+    float confidence = result.getOrientationConfidence(); // low values are guesses
+}
 ```
 
 ## Sample app
