@@ -27,6 +27,7 @@ import android.util.Log;
 import androidx.annotation.IntDef;
 import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.annotation.WorkerThread;
 
 import com.googlecode.leptonica.android.Pix;
@@ -306,6 +307,83 @@ public class TessBaseAPI {
 					"percent=" + percent +
 					", wordRect=" + wordRect +
 					", textRect=" + textRect +
+					'}';
+		}
+	}
+
+	/**
+	 * Result of {@link #detectOrientationScript()}: the page's orientation and its script.
+	 */
+	public static final class OrientationScript {
+		private final int orientation;
+		private final float orientationConfidence;
+		private final String script;
+		private final float scriptConfidence;
+
+		public OrientationScript(int orientation, float orientationConfidence,
+								 @NonNull String script, float scriptConfidence) {
+			this.orientation = orientation;
+			this.orientationConfidence = orientationConfidence;
+			this.script = script;
+			this.scriptConfidence = scriptConfidence;
+		}
+
+		/**
+		 * Return the page's orientation as Tesseract reports it
+		 * ("Orientation in degrees" in its OSD output).
+		 *
+		 * @return 0, 90, 180 or 270
+		 */
+		public int getOrientation() {
+			return orientation;
+		}
+
+		/**
+		 * Return the clockwise rotation that makes the page upright
+		 * ("Rotate" in Tesseract's OSD output).
+		 *
+		 * @return 0, 90, 180 or 270
+		 */
+		public int getRotateClockwise() {
+			return (360 - orientation) % 360;
+		}
+
+		/**
+		 * Return the confidence of the orientation. It has no upper bound,
+		 * and low values mean Tesseract could not tell the orientations apart.
+		 *
+		 * @return the orientation confidence
+		 */
+		public float getOrientationConfidence() {
+			return orientationConfidence;
+		}
+
+		/**
+		 * Return the name of the detected script, such as "Latin" or "Cyrillic".
+		 *
+		 * @return the script name
+		 */
+		@NonNull
+		public String getScript() {
+			return script;
+		}
+
+		/**
+		 * Return the confidence of the script.
+		 *
+		 * @return the script confidence
+		 */
+		public float getScriptConfidence() {
+			return scriptConfidence;
+		}
+
+		@Override
+		public String toString() {
+			return "OrientationScript{" +
+					"orientation=" + orientation +
+					", orientationConfidence=" + orientationConfidence +
+					", script=" + script +
+					", scriptConfidence=" + scriptConfidence +
 					'}';
 		}
 	}
@@ -825,6 +903,32 @@ public class TessBaseAPI {
 	}
 
 	/**
+	 * Detects the orientation and script of the current image (orientation and
+	 * script detection, OSD).
+	 * <p>
+	 * It uses the legacy engine's osd.traineddata, so initialize this instance with
+	 * the "osd" language, then call {@link #setImage(Pix)} or another setImage method.
+	 * Recognition needs a separate instance initialized with the text's language.
+	 *
+	 * @return the orientation and script, or null when no image is set or the image
+	 * has too few characters to decide
+	 */
+	@Nullable
+	@WorkerThread
+	public OrientationScript detectOrientationScript() {
+		if (mRecycled)
+			throw new IllegalStateException();
+
+		float[] values = new float[3];
+		String script = nativeDetectOrientationScript(mNativeData, values);
+
+		if (script == null)
+			return null;
+
+		return new OrientationScript((int) values[0], values[1], script, values[2]);
+	}
+
+	/**
 	 * Get a copy of the internal thresholded image from Tesseract.
 	 * <p>
 	 * Caller takes ownership of the Pix and must recycle() it.
@@ -1173,6 +1277,8 @@ public class TessBaseAPI {
 	private native int nativeMeanConfidence(long mNativeData);
 
 	private native int[] nativeWordConfidences(long mNativeData);
+
+	private native String nativeDetectOrientationScript(long mNativeData, float[] values);
 
 	private native String nativeGetVariable(long mNativeData, String var);
 

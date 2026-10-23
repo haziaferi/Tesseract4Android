@@ -401,6 +401,29 @@ jintArray Java_com_googlecode_tesseract_android_TessBaseAPI_nativeWordConfidence
   return ret;
 }
 
+jstring Java_com_googlecode_tesseract_android_TessBaseAPI_nativeDetectOrientationScript(JNIEnv *env,
+                                                                                       jobject thiz,
+                                                                                       jlong mNativeData,
+                                                                                       jfloatArray values) {
+
+  native_data_t *nat = (native_data_t*) mNativeData;
+
+  int orient_deg;
+  float orient_conf;
+  const char *script_name = NULL;
+  float script_conf;
+
+  // Fails when no image is set or the page has too few characters to decide.
+  if (!nat->api.DetectOrientationScript(&orient_deg, &orient_conf, &script_name, &script_conf)) {
+    return NULL;
+  }
+
+  jfloat result[3] = { (jfloat) orient_deg, orient_conf, script_conf };
+  env->SetFloatArrayRegion(values, 0, 3, result);
+
+  return env->NewStringUTF(script_name != NULL ? script_name : "");
+}
+
 jstring Java_com_googlecode_tesseract_android_TessBaseAPI_nativeGetVariable(JNIEnv *env,
                                                                              jobject thiz,
                                                                              jlong mNativeData,

@@ -54,6 +54,11 @@ public class Assets {
 		if (!engFile.exists()) {
 			copyFile(am, "eng.traineddata", engFile);
 		}
+		// Orientation and script detection (tessdata_fast 87416418, same file in tessdata_best).
+		File osdFile = new File(tessDir, "osd.traineddata");
+		if (!osdFile.exists()) {
+			copyFile(am, "osd.traineddata", osdFile);
+		}
 	}
 
 	private static void copyFile(@NonNull AssetManager am, @NonNull String assetName,
