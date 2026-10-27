@@ -855,6 +855,114 @@ public class TessBaseAPITest {
 	}
 
 	@Test
+	public void testRecognize() {
+		final String inputText = "hello world";
+		final Bitmap bmp = getTextImage(inputText, 640, 480);
+
+		final TessBaseAPI baseApi = new TessBaseAPI();
+		assertTrue(baseApi.init(tessDataPath, language));
+		baseApi.setPageSegMode(TessBaseAPI.PageSegMode.PSM_SINGLE_LINE);
+		baseApi.setImage(bmp);
+
+		assertTrue("Recognition did not run to the end.", baseApi.recognize());
+
+		// The getters read the recognition that just ran.
+		assertEquals(inputText, baseApi.getUTF8Text());
+		ResultIterator iterator = baseApi.getResultIterator();
+		assertNotNull(iterator);
+		iterator.begin();
+		assertEquals("hello", iterator.getUTF8Text(PageIteratorLevel.RIL_WORD));
+		iterator.delete();
+
+		baseApi.recycle();
+		bmp.recycle();
+	}
+
+	@Test
+	public void testRecognize_stopBeforeStart() {
+		final Bitmap bmp = getTextImage("hello world", 640, 480);
+
+		final boolean[] progressed = {false};
+		final TessBaseAPI baseApi = new TessBaseAPI(progressValues -> progressed[0] = true);
+		assertTrue(baseApi.init(tessDataPath, language));
+		baseApi.setPageSegMode(TessBaseAPI.PageSegMode.PSM_SINGLE_LINE);
+		baseApi.setImage(bmp);
+
+		// A stop that comes before recognition starts is not lost: recognition does not run.
+		baseApi.stop();
+		assertFalse("Recognition ran after stop().", baseApi.recognize());
+		assertFalse("Recognition started after stop().", progressed[0]);
+
+		// The next image clears the stop.
+		baseApi.setImage(bmp);
+		assertTrue(baseApi.recognize());
+		assertEquals("hello world", baseApi.getUTF8Text());
+
+		// getHOCRText keeps its old behaviour: only a stop made while it runs cancels it.
+		baseApi.setImage(bmp);
+		baseApi.stop();
+		assertTrue(baseApi.getHOCRText(0).contains("hello"));
+
+		baseApi.recycle();
+		bmp.recycle();
+	}
+
+	@Test
+	public void testRecognize_stop() throws InterruptedException {
+		StringBuilder inputTextBuilder = new StringBuilder();
+		for (int i = 0; i < 50; i++) {
+			inputTextBuilder.append("The quick brown fox jumps over the lazy dog.\n");
+		}
+		final Bitmap bmp = getTextImage(inputTextBuilder.toString(), 640, 1000);
+
+		final Semaphore started = new Semaphore(0);
+		final TessBaseAPI baseApi = new TessBaseAPI(progressValues -> {
+			if (progressValues.getPercent() > 0) {
+				started.release();
+			}
+		});
+		assertTrue(baseApi.init(tessDataPath, language));
+		baseApi.setImage(bmp);
+
+		final boolean[] completed = {true};
+		Thread reader = new Thread(() -> completed[0] = baseApi.recognize());
+		reader.start();
+		started.acquire();
+		// From another thread, as an app's cancel button does.
+		baseApi.stop();
+		reader.join();
+
+		assertFalse("A stopped recognition reported that it ran to the end.", completed[0]);
+
+		baseApi.recycle();
+		bmp.recycle();
+	}
+
+	@Test
+	public void testStop_fromAnotherThreadWhileProgressIsReported() throws InterruptedException {
+		// stop() used to clear the JNI state the progress callback was about to use; stopping
+		// many recognitions at many points must never crash the process.
+		final Bitmap bmp = getTextImage("The quick brown fox jumps over the lazy dog.", 640, 480);
+		final Semaphore started = new Semaphore(0);
+		final TessBaseAPI baseApi = new TessBaseAPI(progressValues -> started.release());
+		assertTrue(baseApi.init(tessDataPath, language));
+		baseApi.setPageSegMode(TessBaseAPI.PageSegMode.PSM_SINGLE_LINE);
+
+		for (int i = 0; i < 100; i++) {
+			baseApi.setImage(bmp);
+			started.drainPermits();
+			Thread reader = new Thread(() -> baseApi.getHOCRText(0));
+			reader.start();
+			started.acquire();
+			baseApi.stop();
+			reader.join();
+		}
+
+		baseApi.recycle();
+		bmp.recycle();
+	}
+
+	@Test
 	public void testWordConfidences() {
 		final String inputText = "one two three";
 		final Bitmap bmp = getTextImage(inputText, 640, 480);

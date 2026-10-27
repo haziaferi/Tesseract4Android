@@ -101,21 +101,21 @@ public class MainViewModel extends AndroidViewModel {
 
             long startTime = SystemClock.uptimeMillis();
 
-            // Use getHOCRText(0) method to trigger recognition with progress notifications and
+            // Use recognize() method to trigger recognition with progress notifications and
             // ability to cancel ongoing processing.
-            tessApi.getHOCRText(0);
+            tessApi.recognize();
 
             // At this point the recognition has completed (or was interrupted by calling stop())
             // and we can get the results we want. In this case just normal UTF8 text.
             //
-            // Note that calling only this method (without the getHOCRText() above) would also
+            // Note that calling only this method (without the recognize() above) would also
             // trigger the recognition and return the same result, but we would received no progress
             // notifications and we wouldn't be able to stop() the ongoing recognition.
             String text = tessApi.getUTF8Text();
 
             // Alternatively we can get resulting text filtered based on confidence threshold.
             // Note this call internally calls getResultIterator() which means we need to call
-            // getHOCRText or getUTF8Text method before to make sure there are results to process.
+            // recognize or getUTF8Text method before to make sure there are results to process.
             //String text = tessApi.getConfidentText(40, TessBaseAPI.PageIteratorLevel.RIL_WORD);
 
             // We can free up the recognition results and any stored image data in the tessApi
