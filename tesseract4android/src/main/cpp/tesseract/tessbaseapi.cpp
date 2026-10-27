@@ -16,6 +16,7 @@
  * limitations under the License.
  */
 
+#include <atomic>
 #include <stdio.h>
 #include <malloc.h>
 #include "android/bitmap.h"
@@ -35,7 +36,11 @@ struct native_data_t {
 
   Box* currentTextBox = NULL;
   l_int32 lastProgress;
-  bool cancel_ocr;
+  // Set by stop() from any thread and read by the monitor on the recognising thread, so both are atomic.
+  // cancel_ocr stops the recognition in progress and is cleared when the next one starts;
+  // stop_pending lasts until the next image or clear(), so recognize() also honours a stop() that came first.
+  std::atomic<bool> cancel_ocr;
+  std::atomic<bool> stop_pending;
 
   JNIEnv *cachedEnv;
   jobject* cachedObject;
@@ -77,6 +82,7 @@ struct native_data_t {
     cachedEnv = NULL;
     cachedObject = NULL;
     cancel_ocr = false;
+    stop_pending = false;
   }
 
   ~native_data_t() {
@@ -278,6 +284,7 @@ void Java_com_googlecode_tesseract_android_TessBaseAPI_nativeSetImageBytes(JNIEn
   env->ReleaseByteArrayElements(data, data_array, JNI_ABORT);
 
   native_data_t *nat = (native_data_t*) mNativeData;
+  nat->stop_pending = false;
   nat->api.SetImage(imagedata, (int) width, (int) height, (int) bpp, (int) bpl);
 
   // Since Tesseract doesn't take ownership of the memory, we keep a pointer in the native
@@ -300,6 +307,7 @@ void Java_com_googlecode_tesseract_android_TessBaseAPI_nativeSetImagePix(JNIEnv 
   PIX *pixd = pixClone(pixs);
 
   native_data_t *nat = (native_data_t*) mNativeData;
+  nat->stop_pending = false;
   if (pixd) {
     l_int32 width = pixGetWidth(pixd);
     l_int32 height = pixGetHeight(pixd);
@@ -357,8 +365,9 @@ void Java_com_googlecode_tesseract_android_TessBaseAPI_nativeStop(JNIEnv *env,
 
   native_data_t *nat = (native_data_t*) mNativeData;
 
-  // Stop by setting a flag that's used by the monitor
-  nat->resetStateVariables();
+  // Only the flags: the recognising thread owns the cached JNI state, and clearing it from here could
+  // null it between the progress callback's check and its use.
+  nat->stop_pending = true;
   nat->cancel_ocr = true;
 }
 
@@ -469,6 +478,7 @@ void Java_com_googlecode_tesseract_android_TessBaseAPI_nativeClear(JNIEnv *env,
                                                                    jlong mNativeData) {
 
   native_data_t *nat = (native_data_t*) mNativeData;
+  nat->stop_pending = false;
 
   nat->api.Clear();
 
@@ -627,6 +637,31 @@ jlong Java_com_googlecode_tesseract_android_TessBaseAPI_nativeGetResultIterator(
   native_data_t *nat = (native_data_t*) mNativeData;
 
   return (jlong) nat->api.GetIterator();
+}
+
+jboolean Java_com_googlecode_tesseract_android_TessBaseAPI_nativeRecognize(JNIEnv *env,
+                                                                         jobject thiz,
+                                                                         jlong mNativeData) {
+
+  native_data_t *nat = (native_data_t*) mNativeData;
+  nat->initStateVariables(env, &thiz);
+
+  // Checked after cancel_ocr is cleared: a stop() before this line is seen here, one after it by the monitor.
+  if (nat->stop_pending) {
+    nat->resetStateVariables();
+    return JNI_FALSE;
+  }
+
+  tesseract::ETEXT_DESC monitor;
+  monitor.progress_callback2 = progressJavaCallback;
+  monitor.cancel = cancelFunc;
+  monitor.cancel_this = nat;
+
+  // A cancelled recognition returns -1 too, and its partial results stay readable.
+  bool done = nat->api.Recognize(&monitor) == 0 && !nat->cancel_ocr;
+  nat->resetStateVariables();
+
+  return done ? JNI_TRUE : JNI_FALSE;
 }
 
 jstring Java_com_googlecode_tesseract_android_TessBaseAPI_nativeGetHOCRText(JNIEnv *env,

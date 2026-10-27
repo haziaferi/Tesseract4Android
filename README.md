@@ -55,10 +55,10 @@ dependencyResolutionManagement {
 ```gradle
 dependencies {
     // To use Standard variant:
-    implementation 'com.github.haziaferi.Tesseract4Android:tesseract4android:4.11.0'
+    implementation 'com.github.haziaferi.Tesseract4Android:tesseract4android:4.12.0'
 
     // To use OpenMP variant:
-    implementation 'com.github.haziaferi.Tesseract4Android:tesseract4android-openmp:4.11.0'
+    implementation 'com.github.haziaferi.Tesseract4Android:tesseract4android-openmp:4.12.0'
 }
 ```
 
@@ -119,6 +119,47 @@ if (result != null) {
     float confidence = result.getOrientationConfidence(); // low values are guesses
 }
 ```
+
+### Stopping recognition
+
+`recognize()` runs recognition with progress notifications, and `stop()` cancels it from any thread. Read the
+results afterwards with `getUTF8Text()`, `getResultIterator()` and the other getters; they reuse that
+recognition instead of running their own. `getUTF8Text()` on its own can't be stopped.
+
+```java
+// On a worker thread
+tess.setImage(image);
+boolean finished = tess.recognize(); // false if stopped; the words read before the stop remain
+String text = tess.getUTF8Text();
+
+// From any thread, for example a cancel button
+tess.stop();
+```
+
+A `stop()` holds until the next `setImage()` or `clear()`, so one that arrives just before `recognize()` starts
+is not lost: `recognize()` then returns false without reading. `getHOCRText()` can be stopped too, but only by a
+`stop()` made while it runs.
+
+### Reading pages well
+
+These settings come from reading about 80 printed pages on a OnePlus 6T: rendered PDF pages, simulated scans of
+tables and manuals, and phone photos of printed pages, receipts and books, plus two handwritten sheets. They are starting points;
+the evidence is thin where noted.
+
+- **Models.** [tessdata_fast](https://github.com/tesseract-ocr/tessdata_fast) read as well as tessdata_best,
+  within noise, at a quarter to a half of the time.
+- **Resolution.** Scale the page to 200 DPI of its real size and say so with
+  `tess.setVariable("user_defined_dpi", "200")`. That missed the fewest words overall; 300 and 400 DPI were no
+  better and took about 1.1x and 1.5x as long, and 150 DPI lost words on most pages.
+- **Input image.** A contrast-stretched 8-bit grey copy (`setImage(bytes, width, height, 1, width)`) kept a
+  receipt's lines together with their prices, where plain grey read them as two columns.
+- **Orientation.** Turn the page by `detectOrientationScript()` only when `getOrientationConfidence()` is at least
+  3. Every wrong answer had a confidence of 1.5 or less, but there were only four wrong answers.
+- **Layout.** `PSM_AUTO` (3) for ordinary and multi-column pages; `PSM_SINGLE_BLOCK` (6) for tables, which it reads
+  row by row without dropping blocks; `PSM_SINGLE_COLUMN` (4) for receipts and single-column pages.
+- **Confidence.** Dropping words below 40 removed most of the junk read from figures and screenshots, and few real
+  words. A page whose mean word confidence was below 55 was handwriting on every page tried, but only two
+  handwritten sheets were tested, both in block capitals.
 
 ## Sample app
 

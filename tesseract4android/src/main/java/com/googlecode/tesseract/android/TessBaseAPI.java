@@ -778,7 +778,7 @@ public class TessBaseAPI {
 	/**
 	 * The recognized text is returned as a String which is coded as UTF8.
 	 * This is a blocking operation that will not work with {@link #stop()}.
-	 * Call {@link #getHOCRText(int)} before calling this function to
+	 * Call {@link #recognize()} before calling this function to
 	 * interrupt a recognition task with {@link #stop()}
 	 *
 	 * @return the recognized text
@@ -1038,6 +1038,25 @@ public class TessBaseAPI {
 	}
 
 	/**
+	 * Recognize the image, interruptible by {@link #stop()}, without building any output. Read
+	 * the results afterwards with {@link #getUTF8Text()}, {@link #getResultIterator()} or the
+	 * other getters; they reuse this recognition instead of running their own.
+	 * <p>
+	 * A {@link #stop()} made since the last {@link #setImage} or {@link #clear()} is honoured
+	 * even when it came before this call: recognition then does not start.
+	 *
+	 * @return true if recognition ran to the end; false if it failed or was stopped, in which
+	 * case the results hold the words recognized before the stop
+	 */
+	@WorkerThread
+	public boolean recognize() {
+		if (mRecycled)
+			throw new IllegalStateException();
+
+		return nativeRecognize(mNativeData);
+	}
+
+	/**
 	 * Make a HTML-formatted string with hOCR markup from the internal data
 	 * structures. Interruptible by {@link #stop()}.
 	 *
@@ -1130,7 +1149,10 @@ public class TessBaseAPI {
 	}
 
 	/**
-	 * Cancel recognition started by {@link #getHOCRText(int)}.
+	 * Cancel recognition started by {@link #recognize()} or {@link #getHOCRText(int)}. Safe to
+	 * call from any thread. A stop also applies to a later {@link #recognize()} until the next
+	 * {@link #setImage} or {@link #clear()}; {@link #getHOCRText(int)} only sees a stop made
+	 * while it runs.
 	 */
 	public void stop() {
 		if (mRecycled)
@@ -1306,6 +1328,8 @@ public class TessBaseAPI {
 	private native long nativeGetResultIterator(long mNativeData);
 
 	private native String nativeGetBoxText(long mNativeData, int page_number);
+
+	private native boolean nativeRecognize(long mNativeData);
 
 	private native String nativeGetHOCRText(long mNativeData, int page_number);
 
